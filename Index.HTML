@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Проверка чертежей</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --bg-tertiary: #e8e8ed;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --text-tertiary: #aeaeb2;
+            --separator: rgba(0, 0, 0, 0.1);
+            --accent: #007aff;
+            --accent-hover: #0051d5;
+            --destructive: #ff3b30;
+            --success: #34c759;
+            --card-bg: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --overlay: rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #000000;
+            --bg-secondary: #1c1c1e;
+            --bg-tertiary: #2c2c2e;
+            --text-primary: #ffffff;
+            --text-secondary: #98989d;
+            --text-tertiary: #636366;
+            --separator: rgba(255, 255, 255, 0.1);
+            --accent: #0a84ff;
+            --accent-hover: #409cff;
+            --destructive: #ff453a;
+            --success: #32d74b;
+            --card-bg: #1c1c1e;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --overlay: rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 0.5px solid var(--separator);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 44px;
+            z-index: 100;
+        }
+
+        .header-title {
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -0.4px;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .pdf-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-secondary);
+        }
+
+        .pdf-toolbar {
+            background: var(--bg-primary);
+            border-bottom: 0.5px solid var(--separator);
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 44px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .pdf-toolbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .page-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        button {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 17px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 400;
+            white-space: nowrap;
+            transition: background-color 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:hover {
+            background: var(--bg-tertiary);
+        }
+
+        button:active {
+            opacity: 0.6;
+        }
+
+        button.icon-only {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        button.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        button.destructive {
+            color: var(--destructive);
+        }
+
+        button.success {
+            background: var(--success);
+            color: white;
+        }
+
+        button.success:hover {
+            opacity: 0.9;
+        }
+
+        .pdf-viewers {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .pdf-viewer {
+            flex: 1;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .pdf-viewer.hidden {
+            display: none;
+        }
+
+        .pdf-viewer-label {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-tertiary);
+            background: var(--bg-primary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            z-index: 10;
+        }
+
+        canvas {
+            border-radius: 8px;
+            box-shadow: 0 4px 16px var(--shadow);
+            background: white;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .sidebar {
+            width: 380px;
+            background: var(--bg-primary);
+            border-left: 0.5px solid var(--separator);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateX(0);
+            transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(100%);
+        }
+
+        .sidebar-header {
+            background: var(--bg-secondary);
+            border-bottom: 0.5px solid var(--separator);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 44px;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 0.5px solid var(--separator);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s ease;
+        }
+
+        .sidebar-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sidebar-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background: var(--separator);
+            border-radius: 3px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .checklist-section {
+            margin-bottom: 24px;
+        }
+
+        .checklist-section h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .checklist-item {
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item:active {
+            transform: scale(0.98);
+        }
+
+        .checklist-item label {
+            display: flex;
+            align-items: start;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            margin-right: 12px;
+            margin-top: 2px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .checklist-item.checked {
+            opacity: 0.5;
+            background: var(--bg-secondary);
+        }
+
+        .notes-area {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .notes-area:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .export-buttons {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .export-buttons button {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
+            z-index: 1000;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .fab:active {
+            transform: scale(0.9);
+        }
+
+        .fab.rotated {
+            transform: rotate(45deg);
+        }
+
+        .menu-dropdown {
+            position: absolute;
+            top: 52px;
+            left: 16px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 12px;
+            padding: 8px;
+            min-width: 200px;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 8px 24px var(--shadow);
+            z-index: 200;
+            backdrop-filter: blur(20px);
+        }
+
+        .menu-dropdown.show {
+            display: flex;
+        }
+
+        .menu-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 15px;
+            color: var(--text-primary);
+            background: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-item:hover {
+            background: var(--bg-secondary);
+        }
+
+        .menu-separator {
+            height: 0.5px;
+            background: var(--separator);
+            margin: 4px 0;
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+            position: relative;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        @keyframes slideUp {
+            from { 
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to { 
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 20px 20px 16px;
+            border-bottom: 0.5px solid var(--separator);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: var(--bg-secondary);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--text-secondary);
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: var(--separator);
+            border-radius: 3px;
+        }
+
+        .editor-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 0.5px solid var(--separator);
+        }
+
+        .editor-section-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .editor-section-header input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .editor-section-header input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .editor-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .editor-item input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .editor-item input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 0.5px solid var(--separator);
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-footer button {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 20px;
+            box-shadow: 0 8px 24px var(--shadow);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 3000;
+            font-size: 15px;
+            border: 0.5px solid var(--separator);
+            backdrop-filter: blur(20px);
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .header-title {
+                font-size: 15px;
+            }
+
+            .pdf-toolbar {
+                padding: 6px 10px;
+                gap: 8px;
+            }
+
+            button {
+                font-size: 15px;
+                padding: 5px 10px;
+            }
+
+            button.icon-only {
+                width: 32px;
+                height: 32px;
+                font-size: 18px;
+            }
+
+            .pdf-viewers {
+                padding: 8px;
+                gap: 6px;
+            }
+
+            .pdf-viewer {
+                border-radius: 10px;
+                padding: 12px;
+            }
+
+            .sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 50%;
+                max-height: 50vh;
+                border-left: none;
+                border-top: 0.5px solid var(--separator);
+                border-radius: 16px 16px 0 0;
+                z-index: 500;
+                transform: translateY(100%);
+                box-shadow: 0 -8px 24px var(--shadow);
+            }
+
+            .sidebar.collapsed {
+                transform: translateY(100%);
+            }
+
+            .sidebar:not(.collapsed) {
+                transform: translateY(0);
+            }
+
+            .fab {
+                display: flex;
+            }
+
+            .menu-dropdown {
+                left: auto;
+                right: 16px;
+                top: auto;
+                bottom: 86px;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-height: 90vh;
+                border-radius: 12px;
+            }
+
+            .checklist-item {
+                padding: 8px 10px;
+            }
+
+            .checklist-item label {
+                font-size: 13px;
+            }
+
+            .checklist-item input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                margin-right: 10px;
+            }
+
+            .checklist-section h3 {
+                font-size: 13px;
+                margin-bottom: 10px;
+            }
+
+            h2 {
+                font-size: 18px;
+                margin-bottom: 12px;
+            }
+
+            .sidebar-content {
+                padding: 12px;
+            }
+        }
+
+        /* Landscape orientation for mobile */
+        @media (max-width: 932px) and (max-height: 430px) and (orientation: landscape) {
+            .header {
+                padding: 4px 12px;
+                min-height: 36px;
+            }
+
+            .header-title {
+                font-size: 14px;
+            }
+
+            .pdf-toolbar {
+                padding: 4px 8px;
+                min-height: 36px;
+            }
+
+            button.icon-only {
+                width: 28px;
+                height: 28px;
+                font-size: 16px;
+            }
+
+            button {
+                font-size: 13px;
+                padding: 4px 8px;
+            }
+
+            .page-info {
+                font-size: 12px;
+            }
+
+            .pdf-viewers {
+                padding: 6px;
+                gap: 6px;
+            }
+
+            .pdf-viewer {
+                padding: 8px;
+                border-radius: 8px;
+            }
+
+            .pdf-viewer-label {
+                font-size: 10px;
+                padding: 3px 8px;
+                top: 8px;
+                left: 8px;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 60%;
+                max-height: 60vh;
+                border-radius: 12px 12px 0 0;
+            }
+
+            .sidebar-header {
+                padding: 8px 12px;
+                min-height: 36px;
+            }
+
+            .sidebar-header h2 {
+                font-size: 15px;
+            }
+
+            .sidebar-tabs {
+                min-height: 36px;
+            }
+
+            .sidebar-tab {
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            .sidebar-content {
+                padding: 10px;
+            }
+
+            h2 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+
+            .checklist-section {
+                margin-bottom: 16px;
+            }
+
+            .checklist-section h3 {
+                font-size: 12px;
+                margin-bottom: 8px;
+            }
+
+            .checklist-item {
+                padding: 6px 8px;
+                margin-bottom: 6px;
+                border-radius: 8px;
+            }
+
+            .checklist-item label {
+                font-size: 12px;
+                line-height: 1.3;
+            }
+
+            .checklist-item input[type="checkbox"] {
+                width: 16px;
+                height: 16px;
+                margin-right: 8px;
+            }
+
+            .notes-area {
+                min-height: 120px;
+                padding: 10px;
+                font-size: 12px;
+            }
+
+            .export-buttons button {
+                padding: 8px;
+                font-size: 13px;
+            }
+
+            .fab {
+                width: 48px;
+                height: 48px;
+                bottom: 16px;
+                right: 16px;
+                font-size: 20px;
+            }
+
+            .menu-dropdown {
+                bottom: 70px;
+                right: 12px;
+                min-width: 180px;
+                padding: 6px;
+            }
+
+            .menu-item {
+                padding: 8px 10px;
+                font-size: 14px;
+            }
+
+            .toast {
+                bottom: 60px;
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+
+            .modal-content {
+                max-height: 80vh;
+            }
+
+            .modal-header {
+                padding: 12px 16px;
+            }
+
+            .modal-header h2 {
+                font-size: 16px;
+            }
+
+            .modal-body {
+                padding: 12px;
+            }
+
+            .modal-footer {
+                padding: 10px 16px;
+            }
+
+            .editor-section {
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+
+            .editor-item {
+                margin-bottom: 6px;
+            }
+
+            .editor-item input,
+            .editor-section-header input {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .sidebar {
+                width: 340px;
+            }
+        }
+
+        @media print {
+            .header,
+            .pdf-toolbar,
+            .sidebar,
+            .fab,
+            .toast {
+                display: none !important;
+            }
+
+            .pdf-container {
+                border: none;
+            }
+
+            canvas {
+                box-shadow: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="header">
+        <button class="icon-only" id="menuBtn">☰</button>
+        <div class="header-title">Проверка чертежей</div>
+        <button class="icon-only" id="sidebarToggle">◧</button>
+    </div>
+
+    <div class="menu-dropdown" id="menuDropdown">
+        <div class="file-input-wrapper">
+            <button class="menu-item" onclick="document.getElementById('pdf1').click()">
+                <span>📄</span> Загрузить основной
+            </button>
+            <input type="file" id="pdf1" accept=".pdf">
+        </div>
+        <div class="file-input-wrapper">
+            <button class="menu-item" onclick="document.getElementById('pdf2').click()">
+                <span>📑</span> Загрузить для сравнения
+            </button>
+            <input type="file" id="pdf2" accept=".pdf">
+        </div>
+        <div class="menu-separator"></div>
+        <button class="menu-item" id="singleViewBtn">
+            <span>📄</span> Один документ
+        </button>
+        <button class="menu-item" id="dualViewBtn">
+            <span>📊</span> Режим сравнения
+        </button>
+        <div class="menu-separator"></div>
+        <button class="menu-item" id="editChecklistBtn">
+            <span>⚙️</span> Редактор опросника
+        </button>
+        <button class="menu-item" id="themeToggleBtn">
+            <span id="themeIcon">🌙</span> <span id="themeText">Тёмная тема</span>
+        </button>
+    </div>
+
+    <div class="main-container">
+        <div class="pdf-container">
+            <div class="pdf-toolbar">
+                <div class="page-controls">
+                    <button class="icon-only" id="prevPage">‹</button>
+                    <span class="page-info">
+                        <span id="pageNum">0</span> / <span id="pageCount">0</span>
+                    </span>
+                    <button class="icon-only" id="nextPage">›</button>
+                </div>
+                <button class="icon-only" id="zoomOut">−</button>
+                <button class="icon-only" id="zoomIn">+</button>
+                <button id="resetZoom">100%</button>
+                <button class="icon-only" id="syncToggle" title="Синхронная навигация" style="display: none;">🔗</button>
+                <div class="page-controls" id="viewer2Controls" style="display: none;">
+                    <button class="icon-only" id="prevPage2">‹</button>
+                    <span class="page-info">
+                        <span id="pageNum2Display">0</span> / <span id="pageCount2Display">0</span>
+                    </span>
+                    <button class="icon-only" id="nextPage2">›</button>
+                </div>
+            </div>
+
+            <div class="pdf-viewers">
+                <div class="pdf-viewer" id="viewer1">
+                    <div class="pdf-viewer-label">Основной</div>
+                    <canvas id="canvas1"></canvas>
+                </div>
+                <div class="pdf-viewer hidden" id="viewer2">
+                    <div class="pdf-viewer-label">Сравнение</div>
+                    <canvas id="canvas2"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar collapsed" id="sidebar">
+            <div class="sidebar-header">
+                <h2 style="margin: 0; font-size: 17px;">Панель</h2>
+                <button class="icon-only" id="closeSidebar">✕</button>
+            </div>
+
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
+                <button class="sidebar-tab" data-tab="notes">Заметки</button>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="tab-panel active" id="checklist">
+                    <h2>Проверка чертежа</h2>
+                </div>
+
+                <div class="tab-panel" id="notes">
+                    <h2>Заметки</h2>
+                    <textarea class="notes-area" id="notesText" placeholder="Ваши замечания и комментарии..."></textarea>
+                    <div class="export-buttons">
+                        <button class="primary" id="copyNotes">Копировать</button>
+                        <button class="success" id="exportNotes">Экспорт</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="fab" id="fab">+</button>
+
+    <div class="modal" id="editorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактор опросника</h2>
+                <button class="modal-close" id="closeModal">✕</button>
+            </div>
+            
+            <div class="modal-body" id="editorSections"></div>
+            
+            <div class="modal-footer">
+                <button class="success" id="saveChecklist">Сохранить</button>
+                <button id="resetChecklist">Сброс</button>
+                <button id="cancelEdit">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const defaultChecklist = [
+            {
+                id: 'section-1',
+                title: 'Основная информация',
+                items: [
+                    { id: 'title', text: 'Наличие основной надписи (штампа)' },
+                    { id: 'project-name', text: 'Указано наименование проекта' },
+                    { id: 'scale', text: 'Указан масштаб чертежа' },
+                    { id: 'author', text: 'Указаны автор и проверяющий' }
+                ]
+            },
+            {
+                id: 'section-2',
+                title: 'Размеры и спецификация',
+                items: [
+                    { id: 'dimensions', text: 'Проставлены все необходимые размеры' },
+                    { id: 'materials', text: 'Указаны материалы и покрытия' },
+                    { id: 'specification', text: 'Спецификация полная и корректная' },
+                    { id: 'hardware', text: 'Указана вся фурнитура и крепеж' }
+                ]
+            },
+            {
+                id: 'section-3',
+                title: 'Технические требования',
+                items: [
+                    { id: 'tech-requirements', text: 'Технические требования указаны' },
+                    { id: 'tolerances', text: 'Указаны допуски и посадки' },
+                    { id: 'finish', text: 'Указана чистота обработки поверхностей' }
+                ]
+            },
+            {
+                id: 'section-4',
+                title: 'Визуализация',
+                items: [
+                    { id: 'views', text: 'Все необходимые виды и разрезы' },
+                    { id: 'sections', text: 'Сечения обозначены корректно' },
+                    { id: 'details', text: 'Узлы и детали показаны понятно' }
+                ]
+            }
+        ];
+
+        let pdfDoc1 = null, pdfDoc2 = null, pageNum = 1, pageNum2 = 1, pageCount = 0, pageCount2 = 0, scale = 1.5, isDualView = false;
+        let currentChecklist = [], checklistState = {}, isMobile = window.innerWidth <= 768;
+        let isSyncEnabled = true; // Sync navigation by default
+
+        const canvas1 = document.getElementById('canvas1');
+        const canvas2 = document.getElementById('canvas2');
+        const ctx1 = canvas1.getContext('2d');
+        const ctx2 = canvas2.getContext('2d');
+        const viewer1 = document.getElementById('viewer1');
+        const viewer2 = document.getElementById('viewer2');
+        const sidebar = document.getElementById('sidebar');
+        const fab = document.getElementById('fab');
+        const menuDropdown = document.getElementById('menuDropdown');
+
+        window.addEventListener('resize', () => { isMobile = window.innerWidth <= 768; });
+
+        document.getElementById('menuBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            menuDropdown.classList.toggle('show');
+            if (menuDropdown.classList.contains('show')) {
+                fab.classList.add('rotated');
+            } else {
+                fab.classList.remove('rotated');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!menuDropdown.contains(e.target) && e.target.id !== 'menuBtn' && e.target.id !== 'fab') {
+                menuDropdown.classList.remove('show');
+                if (sidebar.classList.contains('collapsed')) {
+                    fab.classList.remove('rotated');
+                }
+            }
+        });
+
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            // Update FAB rotation based on sidebar state
+            if (!sidebar.classList.contains('collapsed')) {
+                fab.classList.add('rotated');
+                menuDropdown.classList.remove('show');
+            } else if (!menuDropdown.classList.contains('show')) {
+                fab.classList.remove('rotated');
+            }
+        });
+
+        document.getElementById('closeSidebar').addEventListener('click', () => {
+            sidebar.classList.add('collapsed');
+            if (!menuDropdown.classList.contains('show')) {
+                fab.classList.remove('rotated');
+            }
+        });
+
+        fab.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isMenuOpen = menuDropdown.classList.contains('show');
+            const isSidebarOpen = !sidebar.classList.contains('collapsed');
+            
+            if (isMenuOpen || isSidebarOpen) {
+                // Close everything
+                menuDropdown.classList.remove('show');
+                sidebar.classList.add('collapsed');
+                fab.classList.remove('rotated');
+            } else {
+                // Open menu
+                menuDropdown.classList.add('show');
+                fab.classList.add('rotated');
+            }
+        });
+
+        sidebar.addEventListener('transitionend', () => {
+            if (!sidebar.classList.contains('collapsed')) {
+                menuDropdown.classList.remove('show');
+            }
+        });
+
+        document.getElementById('pdf1').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileReader = new FileReader();
+                fileReader.onload = function() {
+                    const typedarray = new Uint8Array(this.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                        pdfDoc1 = pdf;
+                        pageCount = pdf.numPages;
+                        document.getElementById('pageCount').textContent = pageCount;
+                        pageNum = 1;
+                        renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                        showToast('Основной чертеж загружен');
+                        menuDropdown.classList.remove('show');
+                    });
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+
+        document.getElementById('pdf2').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileReader = new FileReader();
+                fileReader.onload = function() {
+                    const typedarray = new Uint8Array(this.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                        pdfDoc2 = pdf;
+                        pageCount2 = pdf.numPages;
+                        pageNum2 = 1;
+                        if (isDualView) {
+                            if (isSyncEnabled) {
+                                pageNum2 = pageNum;
+                            }
+                            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                        }
+                        showToast('Документ для сравнения загружен');
+                        menuDropdown.classList.remove('show');
+                    });
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+
+        function renderPage(num, pdfDoc, canvas, ctx, isSecondViewer = false) {
+            if (!pdfDoc) return;
+            pdfDoc.getPage(num).then(function(page) {
+                const viewport = page.getViewport({ scale: scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                page.render({ canvasContext: ctx, viewport: viewport });
+            });
+            
+            if (isSecondViewer) {
+                document.getElementById('pageNum2Display').textContent = num;
+                document.getElementById('pageCount2Display').textContent = pageCount2;
+            } else {
+                document.getElementById('pageNum').textContent = num;
+            }
+        }
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (pageNum <= 1) return;
+            pageNum--;
+            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            
+            if (pdfDoc2 && isDualView && isSyncEnabled) {
+                if (pageNum2 > 1) {
+                    pageNum2--;
+                    renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                }
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            if (pageNum >= pageCount) return;
+            pageNum++;
+            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            
+            if (pdfDoc2 && isDualView && isSyncEnabled) {
+                if (pageNum2 < pageCount2) {
+                    pageNum2++;
+                    renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                }
+            }
+        });
+
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            scale += 0.2;
+            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            if (scale > 0.5) {
+                scale -= 0.2;
+                if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            }
+        });
+
+        document.getElementById('resetZoom').addEventListener('click', () => {
+            scale = 1.5;
+            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+        });
+
+        document.getElementById('singleViewBtn').addEventListener('click', () => {
+            isDualView = false;
+            viewer2.classList.add('hidden');
+            document.getElementById('syncToggle').style.display = 'none';
+            showToast('Режим одного документа');
+            menuDropdown.classList.remove('show');
+        });
+
+        // Sync toggle
+        const syncToggle = document.getElementById('syncToggle');
+        const viewer2Controls = document.getElementById('viewer2Controls');
+        
+        function updateSyncButton() {
+            if (isSyncEnabled) {
+                syncToggle.textContent = '🔗';
+                syncToggle.title = 'Синхронная навигация (листать вместе)';
+                syncToggle.style.opacity = '1';
+                viewer2Controls.style.display = 'none';
+            } else {
+                syncToggle.textContent = '⛓️‍💥';
+                syncToggle.title = 'Независимая навигация (листать отдельно)';
+                syncToggle.style.opacity = '0.6';
+                if (isDualView && pdfDoc2) {
+                    viewer2Controls.style.display = 'flex';
+                }
+            }
+        }
+        
+        updateSyncButton();
+        
+        syncToggle.addEventListener('click', () => {
+            isSyncEnabled = !isSyncEnabled;
+            updateSyncButton();
+            
+            if (isSyncEnabled) {
+                // Sync to current page of first document
+                pageNum2 = pageNum;
+                if (pdfDoc2 && isDualView) {
+                    renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                }
+                showToast('Синхронная навигация');
+            } else {
+                showToast('Независимая навигация');
+            }
+        });
+
+        // Navigation buttons for second viewer
+        document.getElementById('prevPage2').addEventListener('click', () => {
+            if (!pdfDoc2 || pageNum2 <= 1) return;
+            pageNum2--;
+            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+        });
+
+        document.getElementById('nextPage2').addEventListener('click', () => {
+            if (!pdfDoc2 || pageNum2 >= pageCount2) return;
+            pageNum2++;
+            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+        });
+
+        // Add scroll/swipe navigation for second viewer when not synced
+        canvas2.parentElement.addEventListener('wheel', (e) => {
+            if (!isSyncEnabled && isDualView && pdfDoc2) {
+                e.preventDefault();
+                
+                if (e.deltaY < 0 && pageNum2 > 1) {
+                    // Scroll up - previous page
+                    pageNum2--;
+                    renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                } else if (e.deltaY > 0 && pageNum2 < pageCount2) {
+                    // Scroll down - next page
+                    pageNum2++;
+                    renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                }
+            }
+        });
+
+        // Add touch navigation for second viewer
+        let touchStartY = 0;
+        canvas2.parentElement.addEventListener('touchstart', (e) => {
+            if (!isSyncEnabled && isDualView) {
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+
+        canvas2.parentElement.addEventListener('touchend', (e) => {
+            if (!isSyncEnabled && isDualView && pdfDoc2) {
+                const touchEndY = e.changedTouches[0].clientY;
+                const diff = touchStartY - touchEndY;
+                
+                if (Math.abs(diff) > 50) { // Minimum swipe distance
+                    if (diff > 0 && pageNum2 < pageCount2) {
+                        // Swipe up - next page
+                        pageNum2++;
+                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                    } else if (diff < 0 && pageNum2 > 1) {
+                        // Swipe down - previous page
+                        pageNum2--;
+                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                    }
+                }
+            }
+        });
+
+        document.getElementById('dualViewBtn').addEventListener('click', () => {
+            if (!pdfDoc2) {
+                showToast('Загрузите второй документ');
+                return;
+            }
+            isDualView = true;
+            viewer2.classList.remove('hidden');
+            document.getElementById('syncToggle').style.display = 'flex';
+            
+            if (isSyncEnabled) {
+                pageNum2 = pageNum;
+            }
+            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            showToast('Режим сравнения');
+            menuDropdown.classList.remove('show');
+        });
+
+        let isDarkTheme = localStorage.getItem('theme') === 'dark';
+        
+        function applyTheme() {
+            document.body.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
+            document.getElementById('themeIcon').textContent = isDarkTheme ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = isDarkTheme ? 'Светлая тема' : 'Тёмная тема';
+        }
+        
+        applyTheme();
+        
+        document.getElementById('themeToggleBtn').addEventListener('click', () => {
+            isDarkTheme = !isDarkTheme;
+            localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+            applyTheme();
+            menuDropdown.classList.remove('show');
+        });
+
+        document.querySelectorAll('.sidebar-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const targetTab = this.dataset.tab;
+                document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(targetTab).classList.add('active');
+            });
+        });
+
+        function loadChecklistData() {
+            const saved = localStorage.getItem('checklistData');
+            currentChecklist = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultChecklist));
+        }
+
+        function saveChecklistData() {
+            localStorage.setItem('checklistData', JSON.stringify(currentChecklist));
+        }
+
+        function renderChecklist() {
+            const container = document.getElementById('checklist');
+            container.innerHTML = '<h2>Проверка чертежа</h2>';
+            
+            currentChecklist.forEach(section => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'checklist-section';
+                
+                const title = document.createElement('h3');
+                title.textContent = section.title;
+                sectionDiv.appendChild(title);
+                
+                section.items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'checklist-item';
+                    if (checklistState[item.id]) itemDiv.classList.add('checked');
+                    
+                    const label = document.createElement('label');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.dataset.item = item.id;
+                    checkbox.checked = checklistState[item.id] || false;
+                    
+                    checkbox.addEventListener('change', function() {
+                        itemDiv.classList.toggle('checked', this.checked);
+                        saveChecklistState();
+                    });
+                    
+                    const span = document.createElement('span');
+                    span.textContent = item.text;
+                    
+                    label.appendChild(checkbox);
+                    label.appendChild(span);
+                    itemDiv.appendChild(label);
+                    sectionDiv.appendChild(itemDiv);
+                });
+                
+                container.appendChild(sectionDiv);
+            });
+        }
+
+        const editorModal = document.getElementById('editorModal');
+        const editorSections = document.getElementById('editorSections');
+        let editingChecklist = [];
+
+        document.getElementById('editChecklistBtn').addEventListener('click', () => {
+            openEditor();
+            menuDropdown.classList.remove('show');
+        });
+
+        document.getElementById('closeModal').addEventListener('click', closeEditor);
+        document.getElementById('cancelEdit').addEventListener('click', closeEditor);
+        editorModal.addEventListener('click', (e) => { if (e.target === editorModal) closeEditor(); });
+
+        function openEditor() {
+            editingChecklist = JSON.parse(JSON.stringify(currentChecklist));
+            renderEditor();
+            editorModal.classList.add('show');
+        }
+
+        function closeEditor() {
+            editorModal.classList.remove('show');
+        }
+
+        function renderEditor() {
+            editorSections.innerHTML = '';
+            
+            editingChecklist.forEach((section, sectionIndex) => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'editor-section';
+                
+                const header = document.createElement('div');
+                header.className = 'editor-section-header';
+                
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = section.title;
+                titleInput.placeholder = 'Название раздела';
+                titleInput.addEventListener('input', function() {
+                    editingChecklist[sectionIndex].title = this.value;
+                });
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'destructive icon-only';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.addEventListener('click', () => {
+                    if (confirm('Удалить раздел "' + section.title + '"?')) {
+                        editingChecklist.splice(sectionIndex, 1);
+                        renderEditor();
+                    }
+                });
+                
+                header.appendChild(titleInput);
+                header.appendChild(deleteBtn);
+                sectionDiv.appendChild(header);
+                
+                section.items.forEach((item, itemIndex) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'editor-item';
+                    
+                    const itemInput = document.createElement('input');
+                    itemInput.type = 'text';
+                    itemInput.value = item.text;
+                    itemInput.placeholder = 'Текст пункта проверки';
+                    itemInput.addEventListener('input', function() {
+                        editingChecklist[sectionIndex].items[itemIndex].text = this.value;
+                    });
+                    
+                    const deleteItemBtn = document.createElement('button');
+                    deleteItemBtn.className = 'destructive icon-only';
+                    deleteItemBtn.textContent = '✕';
+                    deleteItemBtn.addEventListener('click', () => {
+                        editingChecklist[sectionIndex].items.splice(itemIndex, 1);
+                        renderEditor();
+                    });
+                    
+                    itemDiv.appendChild(itemInput);
+                    itemDiv.appendChild(deleteItemBtn);
+                    sectionDiv.appendChild(itemDiv);
+                });
+                
+                const addItemBtn = document.createElement('button');
+                addItemBtn.className = 'primary';
+                addItemBtn.textContent = '+ Добавить пункт';
+                addItemBtn.style.width = '100%';
+                addItemBtn.style.marginTop = '8px';
+                addItemBtn.addEventListener('click', () => {
+                    editingChecklist[sectionIndex].items.push({
+                        id: 'item-' + Date.now(),
+                        text: ''
+                    });
+                    renderEditor();
+                });
+                
+                sectionDiv.appendChild(addItemBtn);
+                editorSections.appendChild(sectionDiv);
+            });
+
+            const addSectionBtn = document.createElement('button');
+            addSectionBtn.className = 'primary';
+            addSectionBtn.textContent = '+ Добавить раздел';
+            addSectionBtn.style.width = '100%';
+            addSectionBtn.addEventListener('click', () => {
+                editingChecklist.push({
+                    id: 'section-' + Date.now(),
+                    title: 'Новый раздел',
+                    items: []
+                });
+                renderEditor();
+            });
+            editorSections.appendChild(addSectionBtn);
+        }
+
+        document.getElementById('saveChecklist').addEventListener('click', () => {
+            let hasEmptySections = false;
+            editingChecklist.forEach(section => {
+                if (!section.title.trim()) hasEmptySections = true;
+                section.items = section.items.filter(item => item.text.trim() !== '');
+            });
+            
+            if (hasEmptySections) {
+                showToast('Заполните названия всех разделов');
+                return;
+            }
+            
+            editingChecklist = editingChecklist.filter(section => section.items.length > 0);
+            
+            if (editingChecklist.length === 0) {
+                showToast('Добавьте хотя бы один раздел');
+                return;
+            }
+            
+            currentChecklist = editingChecklist;
+            saveChecklistData();
+            renderChecklist();
+            closeEditor();
+            showToast('Опросник сохранён');
+        });
+
+        document.getElementById('resetChecklist').addEventListener('click', () => {
+            if (confirm('Вернуть опросник к настройкам по умолчанию?')) {
+                editingChecklist = JSON.parse(JSON.stringify(defaultChecklist));
+                renderEditor();
+                showToast('Восстановлен опросник по умолчанию');
+            }
+        });
+
+        function saveChecklistState() {
+            const state = {};
+            document.querySelectorAll('.checklist-item input[type="checkbox"]').forEach(checkbox => {
+                state[checkbox.dataset.item] = checkbox.checked;
+            });
+            checklistState = state;
+            localStorage.setItem('checklistState', JSON.stringify(state));
+        }
+
+        function loadChecklistState() {
+            checklistState = JSON.parse(localStorage.getItem('checklistState') || '{}');
+        }
+
+        document.getElementById('copyNotes').addEventListener('click', () => {
+            const fullText = getChecklistSummary() + '\n\n' + document.getElementById('notesText').value;
+            navigator.clipboard.writeText(fullText).then(() => showToast('Текст скопирован'));
+        });
+
+        document.getElementById('exportNotes').addEventListener('click', () => {
+            const fullText = getChecklistSummary() + '\n\n' + document.getElementById('notesText').value;
+            const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `проверка-чертежа-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Файл экспортирован');
+        });
+
+        function getChecklistSummary() {
+            let summary = '=== ПРОВЕРКА ЧЕРТЕЖА ===\n';
+            summary += `Дата: ${new Date().toLocaleString('ru-RU')}\n\n`;
+            
+            currentChecklist.forEach(section => {
+                summary += `${section.title}\n`;
+                section.items.forEach(item => {
+                    const status = checklistState[item.id] ? '✓' : '✗';
+                    summary += `  ${status} ${item.text}\n`;
+                });
+                summary += '\n';
+            });
+            
+            const checkedCount = Object.values(checklistState).filter(v => v).length;
+            const totalCount = currentChecklist.reduce((sum, section) => sum + section.items.length, 0);
+            summary += `Выполнено: ${checkedCount} из ${totalCount}\n`;
+            summary += '='.repeat(40);
+            
+            return summary;
+        }
+
+        const notesText = document.getElementById('notesText');
+        notesText.addEventListener('input', function() {
+            localStorage.setItem('drawingNotes', this.value);
+        });
+
+        const savedNotes = localStorage.getItem('drawingNotes');
+        if (savedNotes) notesText.value = savedNotes;
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        loadChecklistState();
+        loadChecklistData();
+        renderChecklist();
+
+        if (!isMobile) sidebar.classList.remove('collapsed');
+    </script>
+</body>
+</html>
