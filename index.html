@@ -116,6 +116,57 @@
             gap: 12px;
         }
 
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .zoom-slider {
+            width: 120px;
+            height: 4px;
+            background: var(--separator);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .zoom-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .zoom-select {
+            padding: 6px 8px;
+            background: var(--bg-secondary);
+            border: 0.5px solid var(--separator);
+            color: var(--text-primary);
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .zoom-select:focus {
+            border-color: var(--accent);
+        }
+
         .page-info {
             font-size: 13px;
             color: var(--text-secondary);
@@ -770,6 +821,15 @@
             .sidebar-content {
                 padding: 12px;
             }
+
+            .zoom-slider {
+                width: 80px;
+            }
+
+            .zoom-select {
+                font-size: 12px;
+                padding: 4px 6px;
+            }
         }
 
         /* Landscape orientation for mobile */
@@ -981,6 +1041,19 @@
                 padding: 6px 8px;
                 font-size: 12px;
             }
+
+            .zoom-slider {
+                width: 60px;
+            }
+
+            .zoom-select {
+                font-size: 11px;
+                padding: 3px 5px;
+            }
+
+            .zoom-controls {
+                gap: 4px;
+            }
         }
 
         @media (min-width: 769px) and (max-width: 1024px) {
@@ -1061,16 +1134,45 @@
                     </span>
                     <button class="icon-only" id="nextPage">›</button>
                 </div>
-                <button class="icon-only" id="zoomOut">−</button>
-                <button class="icon-only" id="zoomIn">+</button>
-                <button id="resetZoom">100%</button>
+                
+                <div class="zoom-controls">
+                    <input type="range" id="zoomSlider1" min="50" max="300" value="150" step="10" class="zoom-slider">
+                    <select id="zoomSelect1" class="zoom-select">
+                        <option value="50">50%</option>
+                        <option value="75">75%</option>
+                        <option value="100">100%</option>
+                        <option value="125">125%</option>
+                        <option value="150" selected>150%</option>
+                        <option value="175">175%</option>
+                        <option value="200">200%</option>
+                        <option value="250">250%</option>
+                        <option value="300">300%</option>
+                    </select>
+                </div>
+                
                 <button class="icon-only" id="syncToggle" title="Синхронная навигация" style="display: none;">🔗</button>
+                
                 <div class="page-controls" id="viewer2Controls" style="display: none;">
                     <button class="icon-only" id="prevPage2">‹</button>
                     <span class="page-info">
                         <span id="pageNum2Display">0</span> / <span id="pageCount2Display">0</span>
                     </span>
                     <button class="icon-only" id="nextPage2">›</button>
+                </div>
+                
+                <div class="zoom-controls" id="zoomControls2" style="display: none;">
+                    <input type="range" id="zoomSlider2" min="50" max="300" value="150" step="10" class="zoom-slider">
+                    <select id="zoomSelect2" class="zoom-select">
+                        <option value="50">50%</option>
+                        <option value="75">75%</option>
+                        <option value="100">100%</option>
+                        <option value="125">125%</option>
+                        <option value="150" selected>150%</option>
+                        <option value="175">175%</option>
+                        <option value="200">200%</option>
+                        <option value="250">250%</option>
+                        <option value="300">300%</option>
+                    </select>
                 </div>
             </div>
 
@@ -1179,7 +1281,7 @@
             }
         ];
 
-        let pdfDoc1 = null, pdfDoc2 = null, pageNum = 1, pageNum2 = 1, pageCount = 0, pageCount2 = 0, scale = 1.5, isDualView = false;
+        let pdfDoc1 = null, pdfDoc2 = null, pageNum = 1, pageNum2 = 1, pageCount = 0, pageCount2 = 0, scale1 = 1.5, scale2 = 1.5, isDualView = false;
         let currentChecklist = [], checklistState = {}, isMobile = window.innerWidth <= 768;
         let isSyncEnabled = true; // Sync navigation by default
 
@@ -1315,8 +1417,10 @@
 
         function renderPage(num, pdfDoc, canvas, ctx, isSecondViewer = false) {
             if (!pdfDoc) return;
+            const currentScale = isSecondViewer ? scale2 : scale1;
+            
             pdfDoc.getPage(num).then(function(page) {
-                const viewport = page.getViewport({ scale: scale });
+                const viewport = page.getViewport({ scale: currentScale });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 page.render({ canvasContext: ctx, viewport: viewport });
@@ -1356,23 +1460,35 @@
             }
         });
 
-        document.getElementById('zoomIn').addEventListener('click', () => {
-            scale += 0.2;
+        // Zoom controls for document 1
+        const zoomSlider1 = document.getElementById('zoomSlider1');
+        const zoomSelect1 = document.getElementById('zoomSelect1');
+
+        zoomSlider1.addEventListener('input', () => {
+            scale1 = parseInt(zoomSlider1.value) / 100;
+            zoomSelect1.value = zoomSlider1.value;
             if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+        });
+
+        zoomSelect1.addEventListener('change', () => {
+            scale1 = parseInt(zoomSelect1.value) / 100;
+            zoomSlider1.value = zoomSelect1.value;
+            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+        });
+
+        // Zoom controls for document 2
+        const zoomSlider2 = document.getElementById('zoomSlider2');
+        const zoomSelect2 = document.getElementById('zoomSelect2');
+
+        zoomSlider2.addEventListener('input', () => {
+            scale2 = parseInt(zoomSlider2.value) / 100;
+            zoomSelect2.value = zoomSlider2.value;
             if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
         });
 
-        document.getElementById('zoomOut').addEventListener('click', () => {
-            if (scale > 0.5) {
-                scale -= 0.2;
-                if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
-                if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
-            }
-        });
-
-        document.getElementById('resetZoom').addEventListener('click', () => {
-            scale = 1.5;
-            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+        zoomSelect2.addEventListener('change', () => {
+            scale2 = parseInt(zoomSelect2.value) / 100;
+            zoomSlider2.value = zoomSelect2.value;
             if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
         });
 
@@ -1380,6 +1496,7 @@
             isDualView = false;
             viewer2.classList.add('hidden');
             document.getElementById('syncToggle').style.display = 'none';
+            document.getElementById('zoomControls2').style.display = 'none';
             showToast('Режим одного документа');
             menuDropdown.classList.remove('show');
         });
@@ -1452,37 +1569,6 @@
             }
         });
 
-        // Add zoom support with Ctrl+Wheel for all browsers
-        function addZoomSupport(viewer, isSecondViewer = false) {
-            viewer.addEventListener('wheel', (e) => {
-                if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    
-                    const delta = e.deltaY || e.detail || e.wheelDelta;
-                    
-                    if (delta < 0) {
-                        // Zoom in
-                        scale += 0.1;
-                    } else {
-                        // Zoom out
-                        if (scale > 0.5) {
-                            scale -= 0.1;
-                        }
-                    }
-                    
-                    if (pdfDoc1 && !isSecondViewer) {
-                        renderPage(pageNum, pdfDoc1, canvas1, ctx1);
-                    }
-                    if (pdfDoc2 && isDualView) {
-                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
-                    }
-                }
-            }, { passive: false });
-        }
-
-        addZoomSupport(viewer1);
-        addZoomSupport(viewer2, true);
-
         // Add touch navigation for second viewer
         let touchStartY = 0;
         canvas2.parentElement.addEventListener('touchstart', (e) => {
@@ -1510,46 +1596,6 @@
             }
         });
 
-        // Pinch-to-zoom support for mobile
-        function addPinchZoom(viewer, isSecondViewer = false) {
-            let initialDistance = 0;
-            let initialScale = scale;
-
-            viewer.addEventListener('touchstart', (e) => {
-                if (e.touches.length === 2) {
-                    e.preventDefault();
-                    initialDistance = Math.hypot(
-                        e.touches[0].pageX - e.touches[1].pageX,
-                        e.touches[0].pageY - e.touches[1].pageY
-                    );
-                    initialScale = scale;
-                }
-            }, { passive: false });
-
-            viewer.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 2) {
-                    e.preventDefault();
-                    const currentDistance = Math.hypot(
-                        e.touches[0].pageX - e.touches[1].pageX,
-                        e.touches[0].pageY - e.touches[1].pageY
-                    );
-                    
-                    const scaleChange = currentDistance / initialDistance;
-                    scale = Math.max(0.5, Math.min(5, initialScale * scaleChange));
-                    
-                    if (pdfDoc1 && !isSecondViewer) {
-                        renderPage(pageNum, pdfDoc1, canvas1, ctx1);
-                    }
-                    if (pdfDoc2 && isDualView) {
-                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
-                    }
-                }
-            }, { passive: false });
-        }
-
-        addPinchZoom(viewer1);
-        addPinchZoom(viewer2, true);
-
         document.getElementById('dualViewBtn').addEventListener('click', () => {
             if (!pdfDoc2) {
                 showToast('Загрузите второй документ');
@@ -1558,6 +1604,7 @@
             isDualView = true;
             viewer2.classList.remove('hidden');
             document.getElementById('syncToggle').style.display = 'flex';
+            document.getElementById('zoomControls2').style.display = 'flex';
             
             if (isSyncEnabled) {
                 pageNum2 = pageNum;
