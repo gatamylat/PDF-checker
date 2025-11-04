@@ -317,6 +317,15 @@
             .pdf-container.sidebar-hidden {
                 margin-right: 0;
             }
+
+            /* Desktop: PDFs side by side, no wrapper between them */
+            .pdf-viewers {
+                flex-direction: row;
+            }
+
+            .second-controls-wrapper {
+                display: none !important;
+            }
         }
 
         .sidebar-header {
@@ -758,18 +767,20 @@
                 display: none !important;
             }
 
-            /* Controls wrapper between viewers */
+            /* Controls wrapper between viewers - ONLY in portrait mobile */
             .second-controls-wrapper {
                 width: 100%;
                 background: var(--bg-primary);
                 padding: 12px;
                 border-radius: 10px;
                 display: none;
-                flex-direction: column;
-                gap: 12px;
+                flex-direction: row;
+                gap: 16px;
                 align-items: center;
+                justify-content: center;
                 border: 0.5px solid var(--separator);
                 margin: 8px 0;
+                flex-wrap: wrap;
             }
 
             .second-controls-wrapper.show {
@@ -900,6 +911,7 @@
             .pdf-viewers {
                 padding: 4px;
                 gap: 4px;
+                flex-direction: row;
             }
 
             .pdf-viewer {
@@ -912,6 +924,11 @@
                 padding: 3px 8px;
                 top: 6px;
                 left: 6px;
+            }
+
+            /* Hide second controls wrapper in landscape */
+            .second-controls-wrapper {
+                display: none !important;
             }
 
             .sidebar {
@@ -1703,8 +1720,8 @@
             document.getElementById('syncToggle').style.display = 'flex';
             document.getElementById('zoomControls2').style.display = 'flex';
             
-            // Show mobile controls wrapper if on mobile
-            if (window.innerWidth <= 768) {
+            // Show mobile controls wrapper ONLY in portrait mode
+            if (window.innerWidth <= 768 && window.matchMedia('(orientation: portrait)').matches) {
                 document.getElementById('secondControlsWrapper').classList.add('show');
             }
             
