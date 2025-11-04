@@ -460,6 +460,89 @@
             border-color: var(--accent);
         }
 
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .product-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .product-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .templates-section {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .template-btn,
+        .history-btn {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 0.5px solid var(--separator);
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .template-btn:hover,
+        .history-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .templates-dropdown {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .templates-dropdown.show {
+            display: flex;
+        }
+
+        .template-item {
+            padding: 8px 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .template-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .history-section {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
         .export-buttons {
             margin-top: 12px;
             display: flex;
@@ -706,6 +789,102 @@
             padding: 12px;
             font-size: 15px;
             font-weight: 600;
+        }
+
+        .modal-footer button.destructive {
+            background: #ff3b30;
+            color: white;
+        }
+
+        .modal-footer button.destructive:hover {
+            background: #ff2d1f;
+        }
+
+        .history-item {
+            padding: 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .history-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .history-item-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .history-item-date {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .history-item-article {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .history-item-stats {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .template-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .template-text {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .template-delete {
+            padding: 4px 8px;
+            background: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+
+        .template-delete:hover {
+            background: #ff2d1f;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
         }
 
         .toast {
@@ -1278,10 +1457,32 @@
 
                 <div class="tab-panel" id="notes">
                     <h2>Заметки</h2>
+                    
+                    <div class="product-info">
+                        <input type="text" id="productName" class="product-input" placeholder="Наименование изделия">
+                        <input type="text" id="productArticle" class="product-input" placeholder="Артикул изделия">
+                    </div>
+                    
+                    <div class="templates-section">
+                        <button class="template-btn" id="showTemplates">📝 Шаблоны</button>
+                        <button class="template-btn" id="manageTemplates">⚙️ Управление шаблонами</button>
+                    </div>
+                    
+                    <div class="templates-dropdown" id="templatesDropdown"></div>
+                    
                     <textarea class="notes-area" id="notesText" placeholder="Ваши замечания и комментарии..."></textarea>
+                    
                     <div class="export-buttons">
                         <button class="primary" id="copyNotes">Копировать</button>
+                        <button class="primary" id="copyTelegram">📱 Telegram</button>
                         <button class="success" id="exportNotes">Экспорт</button>
+                    </div>
+                    
+                    <div class="history-section">
+                        <button class="history-btn" id="showHistory">📜 История проверок</button>
+                        <button class="history-btn" id="exportBackup">💾 Экспорт бэкапа</button>
+                        <button class="history-btn" id="importBackup">📥 Импорт бэкапа</button>
+                        <input type="file" id="backupFile" accept=".json" style="display: none;">
                     </div>
                 </div>
             </div>
@@ -1303,6 +1504,43 @@
                 <button class="success" id="saveChecklist">Сохранить</button>
                 <button id="resetChecklist">Сброс</button>
                 <button id="cancelEdit">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="historyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>История проверок</h2>
+                <button class="modal-close" id="closeHistory">✕</button>
+            </div>
+            
+            <div class="modal-body" id="historyList" style="max-height: 60vh; overflow-y: auto;"></div>
+            
+            <div class="modal-footer">
+                <button class="destructive" id="clearHistory">Очистить</button>
+                <button id="closeHistoryBtn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="templatesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Управление шаблонами</h2>
+                <button class="modal-close" id="closeTemplates">✕</button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="templatesList"></div>
+                <div style="margin-top: 16px;">
+                    <textarea id="newTemplateText" placeholder="Текст нового шаблона..." style="width: 100%; min-height: 80px; padding: 10px; border-radius: 8px; border: 0.5px solid var(--separator); background: var(--card-bg); color: var(--text-primary); font-size: 14px;"></textarea>
+                    <button class="primary" id="addTemplate" style="width: 100%; margin-top: 8px; padding: 10px;">Добавить шаблон</button>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="closeTemplatesBtn">Закрыть</button>
             </div>
         </div>
     </div>
@@ -2014,6 +2252,337 @@
 
         const savedNotes = localStorage.getItem('drawingNotes');
         if (savedNotes) notesText.value = savedNotes;
+
+        // Product info fields
+        const productName = document.getElementById('productName');
+        const productArticle = document.getElementById('productArticle');
+        
+        const savedProduct = localStorage.getItem('currentProduct');
+        if (savedProduct) {
+            const product = JSON.parse(savedProduct);
+            productName.value = product.name || '';
+            productArticle.value = product.article || '';
+        }
+
+        productName.addEventListener('input', () => {
+            localStorage.setItem('currentProduct', JSON.stringify({
+                name: productName.value,
+                article: productArticle.value
+            }));
+        });
+
+        productArticle.addEventListener('input', () => {
+            localStorage.setItem('currentProduct', JSON.stringify({
+                name: productName.value,
+                article: productArticle.value
+            }));
+        });
+
+        // Templates management
+        let templates = JSON.parse(localStorage.getItem('checklistTemplates') || '[]');
+        
+        function saveTemplates() {
+            localStorage.setItem('checklistTemplates', JSON.stringify(templates));
+        }
+
+        function renderTemplatesList() {
+            const list = document.getElementById('templatesList');
+            if (templates.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><p>Нет сохранённых шаблонов</p></div>';
+                return;
+            }
+            
+            list.innerHTML = templates.map((t, i) => `
+                <div class="template-list-item">
+                    <div class="template-text">${t}</div>
+                    <button class="template-delete" onclick="deleteTemplate(${i})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        window.deleteTemplate = function(index) {
+            if (confirm('Удалить этот шаблон?')) {
+                templates.splice(index, 1);
+                saveTemplates();
+                renderTemplatesList();
+                showToast('Шаблон удалён');
+            }
+        };
+
+        document.getElementById('addTemplate').addEventListener('click', () => {
+            const text = document.getElementById('newTemplateText').value.trim();
+            if (text) {
+                templates.push(text);
+                saveTemplates();
+                renderTemplatesList();
+                document.getElementById('newTemplateText').value = '';
+                showToast('Шаблон добавлен');
+            }
+        });
+
+        // Templates dropdown
+        const templatesDropdown = document.getElementById('templatesDropdown');
+        
+        document.getElementById('showTemplates').addEventListener('click', () => {
+            templatesDropdown.classList.toggle('show');
+            if (templatesDropdown.classList.contains('show')) {
+                templatesDropdown.innerHTML = templates.length === 0 
+                    ? '<div style="padding: 8px; text-align: center; color: var(--text-secondary);">Нет шаблонов</div>'
+                    : templates.map(t => `<div class="template-item">${t}</div>`).join('');
+                
+                templatesDropdown.querySelectorAll('.template-item').forEach((el, i) => {
+                    el.addEventListener('click', () => {
+                        notesText.value += (notesText.value ? '\n' : '') + templates[i];
+                        localStorage.setItem('drawingNotes', notesText.value);
+                        templatesDropdown.classList.remove('show');
+                        showToast('Шаблон добавлен в заметки');
+                    });
+                });
+            }
+        });
+
+        // Templates modal
+        const templatesModal = document.getElementById('templatesModal');
+        
+        document.getElementById('manageTemplates').addEventListener('click', () => {
+            renderTemplatesList();
+            templatesModal.classList.add('show');
+        });
+
+        document.getElementById('closeTemplates').addEventListener('click', () => {
+            templatesModal.classList.remove('show');
+        });
+
+        document.getElementById('closeTemplatesBtn').addEventListener('click', () => {
+            templatesModal.classList.remove('show');
+        });
+
+        templatesModal.addEventListener('click', (e) => {
+            if (e.target === templatesModal) templatesModal.classList.remove('show');
+        });
+
+        // History management
+        let history = JSON.parse(localStorage.getItem('checkHistory') || '[]');
+
+        function saveToHistory() {
+            const entry = {
+                date: new Date().toISOString(),
+                productName: productName.value || 'Без названия',
+                productArticle: productArticle.value || '—',
+                checkedCount: Object.values(checklistState).filter(v => v).length,
+                totalCount: currentChecklist.reduce((sum, section) => sum + section.items.length, 0),
+                notes: notesText.value
+            };
+            
+            history.unshift(entry);
+            if (history.length > 50) history = history.slice(0, 50); // Keep last 50
+            localStorage.setItem('checkHistory', JSON.stringify(history));
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>История проверок пуста</p></div>';
+                return;
+            }
+
+            list.innerHTML = history.map((entry, i) => {
+                const date = new Date(entry.date);
+                const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                
+                return `
+                    <div class="history-item" onclick="loadHistoryEntry(${i})">
+                        <div class="history-item-header">
+                            <div class="history-item-title">${entry.productName}</div>
+                            <div class="history-item-date">${dateStr} ${timeStr}</div>
+                        </div>
+                        <div class="history-item-article">Арт: ${entry.productArticle}</div>
+                        <div class="history-item-stats">✓ ${entry.checkedCount} из ${entry.totalCount}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.loadHistoryEntry = function(index) {
+            const entry = history[index];
+            if (confirm(`Загрузить данные проверки "${entry.productName}"?`)) {
+                productName.value = entry.productName === 'Без названия' ? '' : entry.productName;
+                productArticle.value = entry.productArticle === '—' ? '' : entry.productArticle;
+                notesText.value = entry.notes || '';
+                
+                localStorage.setItem('currentProduct', JSON.stringify({
+                    name: productName.value,
+                    article: productArticle.value
+                }));
+                localStorage.setItem('drawingNotes', notesText.value);
+                
+                document.getElementById('historyModal').classList.remove('show');
+                showToast('Данные загружены');
+            }
+        };
+
+        document.getElementById('showHistory').addEventListener('click', () => {
+            renderHistory();
+            document.getElementById('historyModal').classList.add('show');
+        });
+
+        document.getElementById('closeHistory').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.remove('show');
+        });
+
+        document.getElementById('closeHistoryBtn').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.remove('show');
+        });
+
+        document.getElementById('clearHistory').addEventListener('click', () => {
+            if (confirm('Очистить всю историю проверок?')) {
+                history = [];
+                localStorage.setItem('checkHistory', JSON.stringify(history));
+                renderHistory();
+                showToast('История очищена');
+            }
+        });
+
+        document.getElementById('historyModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('historyModal')) {
+                document.getElementById('historyModal').classList.remove('show');
+            }
+        });
+
+        // Copy for Telegram (HTML formatting)
+        document.getElementById('copyTelegram').addEventListener('click', () => {
+            saveToHistory();
+            
+            let result = '';
+            
+            if (productName.value || productArticle.value) {
+                result += '<b>📋 ПРОВЕРКА ЧЕРТЕЖА</b>\n\n';
+                if (productName.value) result += `<b>Изделие:</b> ${productName.value}\n`;
+                if (productArticle.value) result += `<b>Артикул:</b> ${productArticle.value}\n`;
+                result += '\n';
+            } else {
+                result += '<b>📋 ПРОВЕРКА ЧЕРТЕЖА</b>\n\n';
+            }
+
+            const now = new Date();
+            result += `<i>Дата: ${now.toLocaleDateString('ru-RU')}, ${now.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</i>\n\n`;
+
+            let totalChecked = 0;
+            let totalItems = 0;
+
+            currentChecklist.forEach(section => {
+                result += `<b>${section.section}</b>\n`;
+                section.items.forEach((item, itemIndex) => {
+                    const key = `${section.section}-${itemIndex}`;
+                    const checked = checklistState[key];
+                    totalItems++;
+                    if (checked) totalChecked++;
+                    result += `  ${checked ? '✅' : '❌'} ${item}\n`;
+                });
+                result += '\n';
+            });
+
+            result += `<b>Выполнено:</b> ${totalChecked} из ${totalItems}\n`;
+            result += '━━━━━━━━━━━━━━━━━━━━\n\n';
+
+            if (notesText.value.trim()) {
+                result += `<b>📝 Замечания:</b>\n${notesText.value.trim()}`;
+            }
+
+            navigator.clipboard.writeText(result).then(() => {
+                showToast('📱 Скопировано для Telegram');
+            });
+        });
+
+        // Backup functions
+        document.getElementById('exportBackup').addEventListener('click', () => {
+            const backup = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                checklist: currentChecklist,
+                checklistState: checklistState,
+                templates: templates,
+                history: history,
+                currentProduct: {
+                    name: productName.value,
+                    article: productArticle.value
+                },
+                notes: notesText.value
+            };
+
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pdf-checker-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('💾 Бэкап сохранён');
+        });
+
+        document.getElementById('importBackup').addEventListener('click', () => {
+            document.getElementById('backupFile').click();
+        });
+
+        document.getElementById('backupFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const backup = JSON.parse(event.target.result);
+                    
+                    if (!backup.version) {
+                        showToast('❌ Неверный формат файла');
+                        return;
+                    }
+
+                    if (confirm('Импортировать данные из бэкапа? Текущие данные будут заменены.')) {
+                        if (backup.checklist) {
+                            currentChecklist = backup.checklist;
+                            localStorage.setItem('customChecklist', JSON.stringify(currentChecklist));
+                        }
+                        
+                        if (backup.checklistState) {
+                            checklistState = backup.checklistState;
+                            localStorage.setItem('checklistState', JSON.stringify(checklistState));
+                        }
+                        
+                        if (backup.templates) {
+                            templates = backup.templates;
+                            saveTemplates();
+                        }
+                        
+                        if (backup.history) {
+                            history = backup.history;
+                            localStorage.setItem('checkHistory', JSON.stringify(history));
+                        }
+                        
+                        if (backup.currentProduct) {
+                            productName.value = backup.currentProduct.name || '';
+                            productArticle.value = backup.currentProduct.article || '';
+                            localStorage.setItem('currentProduct', JSON.stringify(backup.currentProduct));
+                        }
+                        
+                        if (backup.notes) {
+                            notesText.value = backup.notes;
+                            localStorage.setItem('drawingNotes', backup.notes);
+                        }
+
+                        renderChecklist();
+                        showToast('✅ Бэкап загружен');
+                    }
+                } catch (err) {
+                    showToast('❌ Ошибка чтения файла');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        });
 
         function showToast(message) {
             const toast = document.getElementById('toast');
