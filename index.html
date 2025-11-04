@@ -744,12 +744,41 @@
 
             .pdf-viewers {
                 padding: 8px;
-                gap: 6px;
+                gap: 0;
+                flex-direction: column;
             }
 
             .pdf-viewer {
                 border-radius: 10px;
                 padding: 12px;
+                width: 100%;
+            }
+
+            .pdf-viewer.hidden {
+                display: none !important;
+            }
+
+            /* Controls wrapper between viewers */
+            .second-controls-wrapper {
+                width: 100%;
+                background: var(--bg-primary);
+                padding: 12px;
+                border-radius: 10px;
+                display: none;
+                flex-direction: column;
+                gap: 12px;
+                align-items: center;
+                border: 0.5px solid var(--separator);
+                margin: 8px 0;
+            }
+
+            .second-controls-wrapper.show {
+                display: flex;
+            }
+
+            .second-controls-wrapper .page-controls,
+            .second-controls-wrapper .zoom-controls {
+                display: flex !important;
             }
 
             .sidebar {
@@ -1181,6 +1210,32 @@
                     <div class="pdf-viewer-label">Основной</div>
                     <canvas id="canvas1"></canvas>
                 </div>
+                
+                <div class="second-controls-wrapper" id="secondControlsWrapper">
+                    <div class="page-controls" id="viewer2ControlsMobile">
+                        <button class="icon-only" id="prevPage2Mobile">‹</button>
+                        <span class="page-info">
+                            <span id="pageNum2DisplayMobile">0</span> / <span id="pageCount2DisplayMobile">0</span>
+                        </span>
+                        <button class="icon-only" id="nextPage2Mobile">›</button>
+                    </div>
+                    
+                    <div class="zoom-controls" id="zoomControls2Mobile">
+                        <input type="range" id="zoomSlider2Mobile" min="50" max="300" value="150" step="10" class="zoom-slider">
+                        <select id="zoomSelect2Mobile" class="zoom-select">
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                            <option value="125">125%</option>
+                            <option value="150" selected>150%</option>
+                            <option value="175">175%</option>
+                            <option value="200">200%</option>
+                            <option value="250">250%</option>
+                            <option value="300">300%</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div class="pdf-viewer hidden" id="viewer2">
                     <div class="pdf-viewer-label">Сравнение</div>
                     <canvas id="canvas2"></canvas>
@@ -1429,6 +1484,8 @@
             if (isSecondViewer) {
                 document.getElementById('pageNum2Display').textContent = num;
                 document.getElementById('pageCount2Display').textContent = pageCount2;
+                document.getElementById('pageNum2DisplayMobile').textContent = num;
+                document.getElementById('pageCount2DisplayMobile').textContent = pageCount2;
             } else {
                 document.getElementById('pageNum').textContent = num;
             }
@@ -1479,17 +1536,32 @@
         // Zoom controls for document 2
         const zoomSlider2 = document.getElementById('zoomSlider2');
         const zoomSelect2 = document.getElementById('zoomSelect2');
+        const zoomSlider2Mobile = document.getElementById('zoomSlider2Mobile');
+        const zoomSelect2Mobile = document.getElementById('zoomSelect2Mobile');
+
+        function updateZoom2(value) {
+            scale2 = parseInt(value) / 100;
+            zoomSelect2.value = value;
+            zoomSlider2.value = value;
+            zoomSelect2Mobile.value = value;
+            zoomSlider2Mobile.value = value;
+            if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+        }
 
         zoomSlider2.addEventListener('input', () => {
-            scale2 = parseInt(zoomSlider2.value) / 100;
-            zoomSelect2.value = zoomSlider2.value;
-            if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updateZoom2(zoomSlider2.value);
         });
 
         zoomSelect2.addEventListener('change', () => {
-            scale2 = parseInt(zoomSelect2.value) / 100;
-            zoomSlider2.value = zoomSelect2.value;
-            if (pdfDoc2 && isDualView) renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updateZoom2(zoomSelect2.value);
+        });
+
+        zoomSlider2Mobile.addEventListener('input', () => {
+            updateZoom2(zoomSlider2Mobile.value);
+        });
+
+        zoomSelect2Mobile.addEventListener('change', () => {
+            updateZoom2(zoomSelect2Mobile.value);
         });
 
         document.getElementById('singleViewBtn').addEventListener('click', () => {
@@ -1497,6 +1569,7 @@
             viewer2.classList.add('hidden');
             document.getElementById('syncToggle').style.display = 'none';
             document.getElementById('zoomControls2').style.display = 'none';
+            document.getElementById('secondControlsWrapper').classList.remove('show');
             showToast('Режим одного документа');
             menuDropdown.classList.remove('show');
         });
@@ -1544,13 +1617,37 @@
             if (!pdfDoc2 || pageNum2 <= 1) return;
             pageNum2--;
             renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updatePage2Display();
         });
 
         document.getElementById('nextPage2').addEventListener('click', () => {
             if (!pdfDoc2 || pageNum2 >= pageCount2) return;
             pageNum2++;
             renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updatePage2Display();
         });
+
+        // Mobile navigation buttons for second viewer
+        document.getElementById('prevPage2Mobile').addEventListener('click', () => {
+            if (!pdfDoc2 || pageNum2 <= 1) return;
+            pageNum2--;
+            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updatePage2Display();
+        });
+
+        document.getElementById('nextPage2Mobile').addEventListener('click', () => {
+            if (!pdfDoc2 || pageNum2 >= pageCount2) return;
+            pageNum2++;
+            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            updatePage2Display();
+        });
+
+        function updatePage2Display() {
+            document.getElementById('pageNum2Display').textContent = pageNum2;
+            document.getElementById('pageCount2Display').textContent = pageCount2;
+            document.getElementById('pageNum2DisplayMobile').textContent = pageNum2;
+            document.getElementById('pageCount2DisplayMobile').textContent = pageCount2;
+        }
 
         // Add scroll/swipe navigation for second viewer when not synced
         canvas2.parentElement.addEventListener('wheel', (e) => {
@@ -1605,6 +1702,11 @@
             viewer2.classList.remove('hidden');
             document.getElementById('syncToggle').style.display = 'flex';
             document.getElementById('zoomControls2').style.display = 'flex';
+            
+            // Show mobile controls wrapper if on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('secondControlsWrapper').classList.add('show');
+            }
             
             if (isSyncEnabled) {
                 pageNum2 = pageNum;
