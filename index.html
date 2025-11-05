@@ -267,6 +267,22 @@
             padding: 4px 10px;
             border-radius: 6px;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: calc(100% - 24px);
+        }
+
+        .pdf-filename {
+            font-size: 11px;
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
         }
 
         .drop-zone {
@@ -1578,7 +1594,10 @@
 
             <div class="pdf-viewers">
                 <div class="pdf-viewer" id="viewer1">
-                    <div class="pdf-viewer-label">Основной</div>
+                    <div class="pdf-viewer-label">
+                        <span>Основной</span>
+                        <span class="pdf-filename" id="filename1"></span>
+                    </div>
                     <div class="drop-zone" id="dropZone1" style="display: none;">
                         <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
                         <div style="font-size: 17px; font-weight: 600; margin-bottom: 8px;">Перетащите файл сюда</div>
@@ -1613,25 +1632,31 @@
                 </div>
                 
                 <div class="pdf-viewer hidden" id="viewer2">
-                    <div class="pdf-viewer-label">Сравнение</div>
+                    <div class="pdf-viewer-label">
+                        <span>Сравнение</span>
+                        <span class="pdf-filename" id="filename2"></span>
+                    </div>
                     <div class="drop-zone" id="dropZone2" style="display: none;">
                         <div style="font-size: 48px; margin-bottom: 16px;">📑</div>
                         <div style="font-size: 17px; font-weight: 600; margin-bottom: 8px;">Перетащите файл сюда</div>
                         <div style="font-size: 15px; color: var(--text-secondary);">или кликните для выбора</div>
                     </div>
                     <canvas id="canvas2"></canvas>
-                    
-                    <div class="sidebar collapsed" id="sidebar">
-                        <div class="sidebar-header">
-                            <h2 style="margin: 0; font-size: 17px;">Панель</h2>
-                            <button class="icon-only" id="closeSidebar">✕</button>
-                        </div>
+                </div>
+            </div>
+        </div>
 
-                        <div class="sidebar-tabs">
-                            <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
-                            <button class="sidebar-tab" data-tab="notes">Заметки</button>
-                            <button class="sidebar-tab" data-tab="comments">Комментарии</button>
-                        </div>
+        <div class="sidebar collapsed" id="sidebar">
+            <div class="sidebar-header">
+                <h2 style="margin: 0; font-size: 17px;">Панель</h2>
+                <button class="icon-only" id="closeSidebar">✕</button>
+            </div>
+
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
+                <button class="sidebar-tab" data-tab="notes">Заметки</button>
+                <button class="sidebar-tab" data-tab="comments">Комментарии</button>
+            </div>
 
             <div class="sidebar-content">
                 <div class="tab-panel active" id="checklist">
@@ -1691,9 +1716,6 @@
                         <button class="primary" id="copyComments">Копировать</button>
                         <button class="success" id="exportComments">Экспорт</button>
                     </div>
-                </div>
-            </div>
-        </div>
                 </div>
             </div>
         </div>
@@ -1896,6 +1918,9 @@
         document.getElementById('pdf1').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Display filename
+                document.getElementById('filename1').textContent = file.name;
+                
                 const fileReader = new FileReader();
                 fileReader.onload = function() {
                     const typedarray = new Uint8Array(this.result);
@@ -1917,6 +1942,9 @@
         document.getElementById('pdf2').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Display filename
+                document.getElementById('filename2').textContent = file.name;
+                
                 const fileReader = new FileReader();
                 fileReader.onload = function() {
                     const typedarray = new Uint8Array(this.result);
