@@ -1663,7 +1663,16 @@
                 <button class="modal-close" id="closeModal">✕</button>
             </div>
             
-            <div class="modal-body" id="editorSections"></div>
+            <div class="modal-body">
+                <div class="checklist-section" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                    <h3 style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">ВИЗУАЛИЗАЦИЯ</h3>
+                    <div class="checklist-item" style="background: var(--bg-primary);">
+                        <input type="checkbox" id="showAnnotationMarkers">
+                        <label for="showAnnotationMarkers">Показывать маркеры комментариев на чертеже</label>
+                    </div>
+                </div>
+                <div id="editorSections"></div>
+            </div>
             
             <div class="modal-footer">
                 <button class="success" id="saveChecklist">Сохранить</button>
@@ -1947,7 +1956,8 @@
                 }
             });
 
-            if (!annotations || annotations.length === 0) return;
+            // Exit if markers are disabled or no annotations
+            if (!showAnnotationMarkers || !annotations || annotations.length === 0) return;
 
             // Create new overlay
             const overlay = document.createElement('div');
@@ -2057,6 +2067,7 @@
         // Comments extraction
         let allComments = {};
         let currentPageAnnotations = [];
+        let showAnnotationMarkers = false; // Default: markers are hidden
 
         // Workaround for PDF.js not decoding unicode Contents in annotations
         async function extractAnnotationContents(page, annotation) {
@@ -3054,6 +3065,26 @@
                 renderEditor();
                 showToast('Восстановлен опросник по умолчанию');
             }
+        });
+
+        // Annotation markers visibility toggle
+        const showAnnotationMarkersCheckbox = document.getElementById('showAnnotationMarkers');
+        
+        // Load saved state
+        showAnnotationMarkers = localStorage.getItem('showAnnotationMarkers') === 'true';
+        showAnnotationMarkersCheckbox.checked = showAnnotationMarkers;
+        
+        // Handle checkbox change
+        showAnnotationMarkersCheckbox.addEventListener('change', () => {
+            showAnnotationMarkers = showAnnotationMarkersCheckbox.checked;
+            localStorage.setItem('showAnnotationMarkers', showAnnotationMarkers);
+            
+            // Re-render current page to show/hide markers
+            if (pdfDoc1) {
+                renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            }
+            
+            showToast(showAnnotationMarkers ? '✓ Маркеры показаны' : '✗ Маркеры скрыты');
         });
 
         function saveChecklistState() {
