@@ -1862,32 +1862,40 @@
                     const comment = {
                         page: pageNumber,
                         type: annotation.subtype,
-                        content: annotation.contents || '',
+                        content: '',
                         author: annotation.title || '',
                         color: annotation.color || null,
-                        rect: annotation.rect || null
+                        rect: annotation.rect || null,
+                        highlightedText: ''
                     };
                     
-                    // Extract text content for highlight/underline/strikeout annotations
+                    // Extract text content from the annotated region for context
                     if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
-                        // Try to get text from the annotated region
                         const annotatedText = extractTextFromRect(textContent, annotation.rect);
                         if (annotatedText) {
                             comment.highlightedText = annotatedText;
-                            if (!comment.content) {
-                                comment.content = annotatedText;
-                            } else {
-                                comment.content = `${annotatedText}\n${comment.content}`;
-                            }
-                        } else if (!comment.content) {
+                        }
+                        
+                        // PRIORITY: annotation.contents is the actual comment from the manager
+                        if (annotation.contents && annotation.contents.trim()) {
+                            comment.content = annotation.contents.trim();
+                        } else if (annotatedText) {
+                            // Fallback: if no comment text, show what was highlighted
+                            comment.content = annotatedText;
+                        } else {
                             comment.content = 'Выделение';
                         }
-                    } else if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                    } else if (annotation.subtype === 'FreeText') {
                         comment.content = annotation.contents || '';
+                    } else if (annotation.subtype === 'Text') {
+                        // Sticky note - always has contents
+                        comment.content = annotation.contents || 'Заметка';
                     } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
                         comment.content = annotation.contents || 'Геометрическая метка';
                     } else if (annotation.subtype === 'Ink') {
                         comment.content = annotation.contents || 'Рисунок/стрелка';
+                    } else {
+                        comment.content = annotation.contents || 'Комментарий';
                     }
                     
                     if (comment.content) {
@@ -1958,11 +1966,16 @@
                     'Stamp': 'Штамп'
                 };
                 
-                let contentHtml = comment.content;
+                let contentHtml = '';
                 
-                // If there's highlighted text, show it with emphasis
+                // Show manager's comment (annotation.contents)
+                if (comment.content) {
+                    contentHtml = `<div style="margin-bottom: 8px;">${comment.content}</div>`;
+                }
+                
+                // Show highlighted text as context if different from comment
                 if (comment.highlightedText && comment.highlightedText !== comment.content) {
-                    contentHtml = `<strong>"${comment.highlightedText}"</strong><br>${comment.content.replace(comment.highlightedText, '').trim()}`;
+                    contentHtml += `<div style="font-size: 12px; color: var(--text-tertiary); border-left: 2px solid var(--accent); padding-left: 8px; margin-top: 6px;">📍 Контекст: "${comment.highlightedText}"</div>`;
                 }
                 
                 return `
@@ -1972,7 +1985,7 @@
                             <span class="comment-page">Стр. ${comment.page}</span>
                         </div>
                         <div class="comment-content">${contentHtml}</div>
-                        ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
+                        ${comment.author ? `<div class="comment-author">👤 ${comment.author}</div>` : ''}
                     </div>
                 `;
             }).join('');
@@ -1999,29 +2012,36 @@
                         const comment = {
                             page: i,
                             type: annotation.subtype,
-                            content: annotation.contents || '',
-                            author: annotation.title || ''
+                            content: '',
+                            author: annotation.title || '',
+                            highlightedText: ''
                         };
                         
-                        // Extract text content for highlight/underline/strikeout annotations
+                        // Extract text content from the annotated region for context
                         if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
                             const annotatedText = extractTextFromRect(textContent, annotation.rect);
                             if (annotatedText) {
                                 comment.highlightedText = annotatedText;
-                                if (!comment.content) {
-                                    comment.content = annotatedText;
-                                } else {
-                                    comment.content = `${annotatedText}\n${comment.content}`;
-                                }
-                            } else if (!comment.content) {
+                            }
+                            
+                            // PRIORITY: annotation.contents is the actual comment
+                            if (annotation.contents && annotation.contents.trim()) {
+                                comment.content = annotation.contents.trim();
+                            } else if (annotatedText) {
+                                comment.content = annotatedText;
+                            } else {
                                 comment.content = 'Выделение';
                             }
-                        } else if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                        } else if (annotation.subtype === 'FreeText') {
                             comment.content = annotation.contents || '';
+                        } else if (annotation.subtype === 'Text') {
+                            comment.content = annotation.contents || 'Заметка';
                         } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
                             comment.content = annotation.contents || 'Геометрическая метка';
                         } else if (annotation.subtype === 'Ink') {
                             comment.content = annotation.contents || 'Рисунок/стрелка';
+                        } else {
+                            comment.content = annotation.contents || 'Комментарий';
                         }
                         
                         if (comment.content) {
@@ -2069,11 +2089,16 @@
                         'Stamp': 'Штамп'
                     };
                     
-                    let contentHtml = comment.content;
+                    let contentHtml = '';
                     
-                    // If there's highlighted text, show it with emphasis
+                    // Show manager's comment first
+                    if (comment.content) {
+                        contentHtml = `<div style="margin-bottom: 8px;">${comment.content}</div>`;
+                    }
+                    
+                    // Show highlighted text as context if different
                     if (comment.highlightedText && comment.highlightedText !== comment.content) {
-                        contentHtml = `<strong>"${comment.highlightedText}"</strong><br>${comment.content.replace(comment.highlightedText, '').trim()}`;
+                        contentHtml += `<div style="font-size: 12px; color: var(--text-tertiary); border-left: 2px solid var(--accent); padding-left: 8px; margin-top: 6px;">📍 Контекст: "${comment.highlightedText}"</div>`;
                     }
                     
                     html += `
@@ -2083,7 +2108,7 @@
                                 <span class="comment-page">Стр. ${comment.page}</span>
                             </div>
                             <div class="comment-content">${contentHtml}</div>
-                            ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
+                            ${comment.author ? `<div class="comment-author">👤 ${comment.author}</div>` : ''}
                         </div>
                     `;
                 });
