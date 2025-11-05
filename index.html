@@ -1852,30 +1852,31 @@
         // Workaround for PDF.js not decoding unicode Contents in annotations
         async function extractAnnotationContents(page, annotation) {
             try {
-                // Try to access raw PDF object
-                const pdfPage = page;
+                // Try to access raw PDF object and extract actual string value
                 
-                // PDF.js sometimes doesn't decode unicode strings in Contents
-                // Try alternative methods to get the text
-                
-                // Method 1: Check if annotation has raw data
+                // Method 1: Check contentsObj (it's a Name/Dict object, need to extract value)
                 if (annotation.contentsObj) {
-                    return String(annotation.contentsObj);
-                }
-                
-                // Method 2: Try to get from annotation reference
-                if (annotation.ref && pdfPage.commonObjs) {
-                    try {
-                        const obj = await pdfPage.commonObjs.get(annotation.ref);
-                        if (obj && obj.Contents) {
-                            return String(obj.Contents);
-                        }
-                    } catch (e) {
-                        // Failed to get object
+                    const obj = annotation.contentsObj;
+                    console.log('contentsObj type:', typeof obj, obj);
+                    
+                    // If it's a Dict/Name object, try to get the actual string
+                    if (obj.str) return obj.str;
+                    if (obj.name) return obj.name;
+                    if (obj.value) return String(obj.value);
+                    if (typeof obj === 'string') return obj;
+                    
+                    // Try to call toString
+                    if (obj.toString && obj.toString() !== '[object Object]') {
+                        return obj.toString();
                     }
                 }
                 
-                // Method 3: Return undefined to signal no contents found
+                // Method 2: Try richText
+                if (annotation.richText) {
+                    return String(annotation.richText);
+                }
+                
+                // Method 3: Return null
                 return null;
             } catch (err) {
                 console.error('Error in extractAnnotationContents:', err);
@@ -1946,9 +1947,39 @@
                     
                     // Try workaround method
                     const altContents = await extractAnnotationContents(page, annotation);
-                    if (altContents) {
+                    if (altContents && altContents !== '[object Object]') {
                         commentText = altContents;
                         console.log('%c✓ Got contents from workaround method!', 'color: green', commentText);
+                    } else if (altContents) {
+                        console.warn('Got object instead of string:', altContents);
+                        
+                        // Try to extract from PDF.js internal structure
+                        // contentsObj is a Name object - access internal properties
+                        if (annotation.contentsObj) {
+                            // Try accessing internal PDF.js Name properties
+                            const obj = annotation.contentsObj;
+                            
+                            // PDF.js Name objects have internal properties
+                            if (obj._name) commentText = obj._name;
+                            else if (obj.name) commentText = obj.name;
+                            else if (obj.str) commentText = obj.str;
+                            else if (obj._str) commentText = obj._str;
+                            else if (obj.value) commentText = obj.value;
+                            
+                            // Last resort: try to JSON stringify and extract
+                            if (!commentText) {
+                                try {
+                                    const jsonStr = JSON.stringify(obj);
+                                    console.log('JSON of contentsObj:', jsonStr);
+                                } catch (e) {
+                                    console.error('Cannot stringify contentsObj');
+                                }
+                            }
+                            
+                            if (commentText) {
+                                console.log('%c✓✓ Extracted from contentsObj!', 'color: green; font-weight: bold', commentText);
+                            }
+                        }
                     }
                     
                     // Try all possible content fields
