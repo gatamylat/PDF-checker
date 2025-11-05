@@ -1921,11 +1921,31 @@
             }
         }
 
+        // Update overlays when scale changes
+        function updateAnnotationOverlays() {
+            if (!pdfDoc1 || !currentPageAnnotations.length) return;
+            
+            pdfDoc1.getPage(pageNum).then(function(page) {
+                const viewport = page.getViewport({ scale: scale1 });
+                renderAnnotationOverlays(canvas1, currentPageAnnotations, viewport);
+            });
+        }
+
         // Render annotation overlays on canvas
         function renderAnnotationOverlays(canvas, annotations, viewport) {
-            // Remove existing overlays from ALL canvases (cleanup)
-            document.querySelectorAll('.annotation-overlay').forEach(el => el.remove());
-            document.querySelectorAll('.annotation-tooltip').forEach(el => el.remove());
+            // Remove existing overlays from this canvas
+            const parent = canvas.parentElement;
+            const existingOverlay = parent.querySelector('.annotation-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+            
+            // Remove orphaned tooltips
+            document.querySelectorAll('.annotation-tooltip').forEach(el => {
+                if (!document.body.contains(el.previousElementSibling)) {
+                    el.remove();
+                }
+            });
 
             if (!annotations || annotations.length === 0) return;
 
@@ -1943,12 +1963,9 @@
                 const [x1, y1, x2, y2] = comment.rect;
                 
                 // Convert PDF coordinates to canvas coordinates
-                // PDF uses bottom-left origin, canvas uses top-left
-                const pdfPoint1 = [x1, y1];
-                const pdfPoint2 = [x2, y2];
-                
-                const canvasPoint1 = viewport.convertToViewportPoint(pdfPoint1[0], pdfPoint1[1]);
-                const canvasPoint2 = viewport.convertToViewportPoint(pdfPoint2[0], pdfPoint2[1]);
+                // Use convertToViewportPoint for precise conversion
+                const canvasPoint1 = viewport.convertToViewportPoint(x1, y1);
+                const canvasPoint2 = viewport.convertToViewportPoint(x2, y2);
                 
                 // Calculate bounding box
                 const left = Math.min(canvasPoint1[0], canvasPoint2[0]);
@@ -1956,15 +1973,11 @@
                 const width = Math.abs(canvasPoint2[0] - canvasPoint1[0]);
                 const height = Math.abs(canvasPoint2[1] - canvasPoint1[1]);
 
-                console.log(`Annotation ${comment.type}:`, {
-                    pdfRect: comment.rect,
-                    canvasPos: { left, top, width, height }
-                });
-
                 const marker = document.createElement('div');
                 marker.className = `annotation-marker ${comment.type.toLowerCase()}`;
                 marker.style.left = left + 'px';
                 marker.style.top = top + 'px';
+                marker.dataset.annotationId = comment.rawAnnotation?.id || index;
                 
                 if (comment.type === 'Text') {
                     // Sticky note icon
@@ -1973,13 +1986,14 @@
                     marker.style.height = '24px';
                 } else if (comment.type === 'Highlight' || comment.type === 'Underline' || comment.type === 'StrikeOut') {
                     // Highlighted area
-                    marker.style.width = width + 'px';
-                    marker.style.height = height + 'px';
+                    marker.style.width = Math.max(width, 10) + 'px';
+                    marker.style.height = Math.max(height, 10) + 'px';
                 }
 
                 // Create tooltip
                 const tooltip = document.createElement('div');
                 tooltip.className = 'annotation-tooltip';
+                tooltip.dataset.annotationId = comment.rawAnnotation?.id || index;
                 
                 if (comment.author) {
                     const authorDiv = document.createElement('div');
@@ -2009,7 +2023,18 @@
                 // Show tooltip on hover
                 marker.addEventListener('mouseenter', (e) => {
                     const rect = marker.getBoundingClientRect();
-                    tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                    const tooltipWidth = 300; // max-width from CSS
+                    let left = rect.left + rect.width / 2;
+                    
+                    // Keep tooltip within viewport
+                    if (left + tooltipWidth / 2 > window.innerWidth) {
+                        left = window.innerWidth - tooltipWidth / 2 - 10;
+                    }
+                    if (left - tooltipWidth / 2 < 0) {
+                        left = tooltipWidth / 2 + 10;
+                    }
+                    
+                    tooltip.style.left = left + 'px';
                     tooltip.style.top = (rect.bottom + 10) + 'px';
                     tooltip.style.transform = 'translateX(-50%)';
                     tooltip.classList.add('show');
@@ -2023,10 +2048,10 @@
             });
 
             // Ensure parent has relative positioning
-            if (!canvas.parentElement.style.position || canvas.parentElement.style.position === 'static') {
-                canvas.parentElement.style.position = 'relative';
+            if (!parent.style.position || parent.style.position === 'static') {
+                parent.style.position = 'relative';
             }
-            canvas.parentElement.appendChild(overlay);
+            parent.appendChild(overlay);
         }
 
         // Comments extraction
@@ -2552,13 +2577,17 @@
         zoomSlider1.addEventListener('input', () => {
             scale1 = parseInt(zoomSlider1.value) / 100;
             zoomSelect1.value = zoomSlider1.value;
-            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            if (pdfDoc1) {
+                renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            }
         });
 
         zoomSelect1.addEventListener('change', () => {
             scale1 = parseInt(zoomSelect1.value) / 100;
             zoomSlider1.value = zoomSelect1.value;
-            if (pdfDoc1) renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            if (pdfDoc1) {
+                renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+            }
         });
 
         // Zoom controls for document 2
