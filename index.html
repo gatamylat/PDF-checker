@@ -950,10 +950,81 @@
             white-space: pre-wrap;
         }
 
-        .comment-author {
+        .annotation-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .annotation-marker {
+            position: absolute;
+            pointer-events: all;
+            cursor: help;
+            transition: opacity 0.2s;
+        }
+
+        .annotation-marker:hover {
+            opacity: 0.8;
+        }
+
+        .annotation-marker.highlight {
+            background: rgba(255, 235, 59, 0.3);
+            border: 1px solid rgba(255, 235, 59, 0.6);
+        }
+
+        .annotation-marker.text {
+            width: 24px;
+            height: 24px;
+            background: #FFC107;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .annotation-tooltip {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 300px;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .annotation-tooltip.show {
+            opacity: 1;
+        }
+
+        .annotation-tooltip-author {
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 6px;
             font-size: 12px;
+        }
+
+        .annotation-tooltip-content {
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+
+        .annotation-tooltip-type {
+            font-size: 11px;
             color: var(--text-tertiary);
             margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #eee;
         }
 
         .toast {
@@ -1827,7 +1898,12 @@
                 const viewport = page.getViewport({ scale: currentScale });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
-                page.render({ canvasContext: ctx, viewport: viewport });
+                page.render({ canvasContext: ctx, viewport: viewport }).promise.then(() => {
+                    // Render annotation overlays after PDF is rendered
+                    if (!isSecondViewer) {
+                        renderAnnotationOverlays(canvas, currentPageAnnotations, viewport);
+                    }
+                });
                 
                 // Extract comments from page if it's the main viewer
                 if (!isSecondViewer) {
@@ -1843,6 +1919,94 @@
             } else {
                 document.getElementById('pageNum').textContent = num;
             }
+        }
+
+        // Render annotation overlays on canvas
+        function renderAnnotationOverlays(canvas, annotations, viewport) {
+            // Remove existing overlay
+            const existingOverlay = canvas.parentElement.querySelector('.annotation-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+
+            // Create new overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'annotation-overlay';
+            overlay.style.width = canvas.width + 'px';
+            overlay.style.height = canvas.height + 'px';
+
+            // Add markers for each annotation
+            annotations.forEach((comment, index) => {
+                if (!comment.rect || comment.rect.length < 4) return;
+
+                const [x1, y1, x2, y2] = comment.rect;
+                
+                // Convert PDF coordinates to canvas coordinates
+                const canvasRect = viewport.convertToViewportRectangle([x1, y1, x2, y2]);
+                const left = Math.min(canvasRect[0], canvasRect[2]);
+                const top = Math.min(canvas.height - canvasRect[1], canvas.height - canvasRect[3]);
+                const width = Math.abs(canvasRect[2] - canvasRect[0]);
+                const height = Math.abs(canvasRect[3] - canvasRect[1]);
+
+                const marker = document.createElement('div');
+                marker.className = `annotation-marker ${comment.type.toLowerCase()}`;
+                marker.style.left = left + 'px';
+                marker.style.top = top + 'px';
+                
+                if (comment.type === 'Text') {
+                    marker.textContent = '💬';
+                } else if (comment.type === 'Highlight') {
+                    marker.style.width = width + 'px';
+                    marker.style.height = height + 'px';
+                }
+
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = 'annotation-tooltip';
+                
+                if (comment.author) {
+                    const authorDiv = document.createElement('div');
+                    authorDiv.className = 'annotation-tooltip-author';
+                    authorDiv.textContent = '👤 ' + comment.author;
+                    tooltip.appendChild(authorDiv);
+                }
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'annotation-tooltip-content';
+                contentDiv.textContent = comment.content;
+                tooltip.appendChild(contentDiv);
+
+                const typeDiv = document.createElement('div');
+                typeDiv.className = 'annotation-tooltip-type';
+                const typeNames = {
+                    'Highlight': '🔆 Выделение',
+                    'Text': '📌 Заметка',
+                    'Underline': '📏 Подчеркивание',
+                    'StrikeOut': '❌ Зачеркивание'
+                };
+                typeDiv.textContent = typeNames[comment.type] || comment.type;
+                tooltip.appendChild(typeDiv);
+
+                document.body.appendChild(tooltip);
+
+                // Show tooltip on hover
+                marker.addEventListener('mouseenter', (e) => {
+                    const rect = marker.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                    tooltip.style.top = (rect.bottom + 10) + 'px';
+                    tooltip.style.transform = 'translateX(-50%)';
+                    tooltip.classList.add('show');
+                });
+
+                marker.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('show');
+                });
+
+                overlay.appendChild(marker);
+            });
+
+            canvas.parentElement.style.position = 'relative';
+            canvas.parentElement.appendChild(overlay);
         }
 
         // Comments extraction
