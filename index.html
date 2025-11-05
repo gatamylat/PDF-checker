@@ -269,6 +269,36 @@
             z-index: 10;
         }
 
+        .drop-zone {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border: 2px dashed var(--separator);
+            border-radius: 12px;
+            z-index: 5;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .drop-zone:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent);
+        }
+
+        .drop-zone.drag-over {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
         canvas {
             border-radius: 8px;
             box-shadow: 0 4px 16px var(--shadow);
@@ -1481,6 +1511,11 @@
             <span>📊</span> Режим сравнения
         </button>
         <div class="menu-separator"></div>
+        <div class="menu-item" style="cursor: default; padding: 8px 12px;">
+            <input type="checkbox" id="showAnnotationMarkers" style="margin-right: 8px; cursor: pointer;">
+            <label for="showAnnotationMarkers" style="cursor: pointer; user-select: none;">Маркеры комментариев</label>
+        </div>
+        <div class="menu-separator"></div>
         <button class="menu-item" id="editChecklistBtn">
             <span>⚙️</span> Редактор опросника
         </button>
@@ -1544,6 +1579,11 @@
             <div class="pdf-viewers">
                 <div class="pdf-viewer" id="viewer1">
                     <div class="pdf-viewer-label">Основной</div>
+                    <div class="drop-zone" id="dropZone1" style="display: none;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+                        <div style="font-size: 17px; font-weight: 600; margin-bottom: 8px;">Перетащите файл сюда</div>
+                        <div style="font-size: 15px; color: var(--text-secondary);">или кликните для выбора</div>
+                    </div>
                     <canvas id="canvas1"></canvas>
                 </div>
                 
@@ -1574,22 +1614,24 @@
                 
                 <div class="pdf-viewer hidden" id="viewer2">
                     <div class="pdf-viewer-label">Сравнение</div>
+                    <div class="drop-zone" id="dropZone2" style="display: none;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📑</div>
+                        <div style="font-size: 17px; font-weight: 600; margin-bottom: 8px;">Перетащите файл сюда</div>
+                        <div style="font-size: 15px; color: var(--text-secondary);">или кликните для выбора</div>
+                    </div>
                     <canvas id="canvas2"></canvas>
-                </div>
-            </div>
-        </div>
+                    
+                    <div class="sidebar collapsed" id="sidebar">
+                        <div class="sidebar-header">
+                            <h2 style="margin: 0; font-size: 17px;">Панель</h2>
+                            <button class="icon-only" id="closeSidebar">✕</button>
+                        </div>
 
-        <div class="sidebar collapsed" id="sidebar">
-            <div class="sidebar-header">
-                <h2 style="margin: 0; font-size: 17px;">Панель</h2>
-                <button class="icon-only" id="closeSidebar">✕</button>
-            </div>
-
-            <div class="sidebar-tabs">
-                <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
-                <button class="sidebar-tab" data-tab="notes">Заметки</button>
-                <button class="sidebar-tab" data-tab="comments">Комментарии</button>
-            </div>
+                        <div class="sidebar-tabs">
+                            <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
+                            <button class="sidebar-tab" data-tab="notes">Заметки</button>
+                            <button class="sidebar-tab" data-tab="comments">Комментарии</button>
+                        </div>
 
             <div class="sidebar-content">
                 <div class="tab-panel active" id="checklist">
@@ -1652,6 +1694,9 @@
                 </div>
             </div>
         </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <button class="fab" id="fab">+</button>
@@ -1664,13 +1709,6 @@
             </div>
             
             <div class="modal-body">
-                <div class="checklist-section" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-                    <h3 style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">ВИЗУАЛИЗАЦИЯ</h3>
-                    <div class="checklist-item" style="background: var(--bg-primary);">
-                        <input type="checkbox" id="showAnnotationMarkers">
-                        <label for="showAnnotationMarkers">Показывать маркеры комментариев на чертеже</label>
-                    </div>
-                </div>
                 <div id="editorSections"></div>
             </div>
             
@@ -1765,7 +1803,7 @@
             }
         ];
 
-        let pdfDoc1 = null, pdfDoc2 = null, pageNum = 1, pageNum2 = 1, pageCount = 0, pageCount2 = 0, scale1 = 1.5, scale2 = 1.5, isDualView = false;
+        let pdfDoc1 = null, pdfDoc2 = null, pageNum = 1, pageNum2 = 1, pageCount = 0, pageCount2 = 0, scale1 = 1.5, scale2 = 1.5, isDualView = true;
         let currentChecklist = [], checklistState = {}, isMobile = window.innerWidth <= 768;
         let isSyncEnabled = true; // Sync navigation by default
 
@@ -1867,6 +1905,7 @@
                         document.getElementById('pageCount').textContent = pageCount;
                         pageNum = 1;
                         renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                        document.getElementById('dropZone1').style.display = 'none';
                         showToast('Основной чертеж загружен');
                         menuDropdown.classList.remove('show');
                     });
@@ -1884,20 +1923,46 @@
                     pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
                         pdfDoc2 = pdf;
                         pageCount2 = pdf.numPages;
+                        document.getElementById('pageCount2Display').textContent = pageCount2;
+                        document.getElementById('pageCount2DisplayMobile').textContent = pageCount2;
                         pageNum2 = 1;
-                        if (isDualView) {
-                            if (isSyncEnabled) {
-                                pageNum2 = pageNum;
-                            }
-                            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
-                        }
-                        showToast('Документ для сравнения загружен');
+                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                        document.getElementById('dropZone2').style.display = 'none';
+                        showToast('Чертеж для сравнения загружен');
                         menuDropdown.classList.remove('show');
                     });
                 };
                 fileReader.readAsArrayBuffer(file);
             }
         });
+
+        // Drop zone click handlers
+        document.getElementById('dropZone1').addEventListener('click', () => {
+            document.getElementById('pdf1').click();
+        });
+
+        document.getElementById('dropZone2').addEventListener('click', () => {
+            document.getElementById('pdf2').click();
+        });
+
+        // Show drop zones on start
+        function updateDropZones() {
+            if (!pdfDoc1) {
+                document.getElementById('dropZone1').style.display = 'flex';
+            } else {
+                document.getElementById('dropZone1').style.display = 'none';
+            }
+            
+            if (isDualView && !pdfDoc2) {
+                document.getElementById('dropZone2').style.display = 'flex';
+            } else {
+                document.getElementById('dropZone2').style.display = 'none';
+            }
+        }
+
+        // Initial drop zones display
+        updateDropZones();
+
 
         function renderPage(num, pdfDoc, canvas, ctx, isSecondViewer = false) {
             if (!pdfDoc) return;
@@ -2638,7 +2703,31 @@
             document.getElementById('syncToggle').style.display = 'none';
             document.getElementById('zoomControls2').style.display = 'none';
             document.getElementById('secondControlsWrapper').classList.remove('show');
+            updateDropZones();
             showToast('Режим одного документа');
+            menuDropdown.classList.remove('show');
+        });
+
+        document.getElementById('dualViewBtn').addEventListener('click', () => {
+            isDualView = true;
+            viewer2.classList.remove('hidden');
+            document.getElementById('syncToggle').style.display = 'flex';
+            document.getElementById('zoomControls2').style.display = 'flex';
+            
+            // Show mobile controls wrapper ONLY in portrait mode
+            if (window.innerWidth <= 768 && window.matchMedia('(orientation: portrait)').matches) {
+                document.getElementById('secondControlsWrapper').classList.add('show');
+            }
+            
+            if (pdfDoc2) {
+                if (isSyncEnabled) {
+                    pageNum2 = pageNum;
+                }
+                renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+            }
+            
+            updateDropZones();
+            showToast('Режим сравнения');
             menuDropdown.classList.remove('show');
         });
 
@@ -2821,28 +2910,6 @@
             }
         });
 
-        document.getElementById('dualViewBtn').addEventListener('click', () => {
-            if (!pdfDoc2) {
-                showToast('Загрузите второй документ');
-                return;
-            }
-            isDualView = true;
-            viewer2.classList.remove('hidden');
-            document.getElementById('syncToggle').style.display = 'flex';
-            document.getElementById('zoomControls2').style.display = 'flex';
-            
-            // Show mobile controls wrapper ONLY in portrait mode
-            if (window.innerWidth <= 768 && window.matchMedia('(orientation: portrait)').matches) {
-                document.getElementById('secondControlsWrapper').classList.add('show');
-            }
-            
-            if (isSyncEnabled) {
-                pageNum2 = pageNum;
-            }
-            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
-            showToast('Режим сравнения');
-            menuDropdown.classList.remove('show');
-        });
 
         let isDarkTheme = localStorage.getItem('theme') === 'dark';
         
@@ -3498,6 +3565,14 @@
             isMobile = window.innerWidth <= 768;
             updatePdfContainerMargin();
         });
+
+        // Initialize dual view mode on start
+        viewer2.classList.remove('hidden');
+        document.getElementById('syncToggle').style.display = 'flex';
+        document.getElementById('zoomControls2').style.display = 'flex';
+        if (window.innerWidth <= 768 && window.matchMedia('(orientation: portrait)').matches) {
+            document.getElementById('secondControlsWrapper').classList.add('show');
+        }
     </script>
 </body>
 </html>
