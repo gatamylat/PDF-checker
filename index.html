@@ -1923,11 +1923,11 @@
 
         // Render annotation overlays on canvas
         function renderAnnotationOverlays(canvas, annotations, viewport) {
-            // Remove existing overlay
-            const existingOverlay = canvas.parentElement.querySelector('.annotation-overlay');
-            if (existingOverlay) {
-                existingOverlay.remove();
-            }
+            // Remove existing overlays from ALL canvases (cleanup)
+            document.querySelectorAll('.annotation-overlay').forEach(el => el.remove());
+            document.querySelectorAll('.annotation-tooltip').forEach(el => el.remove());
+
+            if (!annotations || annotations.length === 0) return;
 
             // Create new overlay
             const overlay = document.createElement('div');
@@ -1935,18 +1935,31 @@
             overlay.style.width = canvas.width + 'px';
             overlay.style.height = canvas.height + 'px';
 
-            // Add markers for each annotation
+            // Add markers for each annotation with valid content
             annotations.forEach((comment, index) => {
-                if (!comment.rect || comment.rect.length < 4) return;
+                // Skip if no valid rect or no content
+                if (!comment.rect || comment.rect.length < 4 || !comment.content) return;
 
                 const [x1, y1, x2, y2] = comment.rect;
                 
                 // Convert PDF coordinates to canvas coordinates
-                const canvasRect = viewport.convertToViewportRectangle([x1, y1, x2, y2]);
-                const left = Math.min(canvasRect[0], canvasRect[2]);
-                const top = Math.min(canvas.height - canvasRect[1], canvas.height - canvasRect[3]);
-                const width = Math.abs(canvasRect[2] - canvasRect[0]);
-                const height = Math.abs(canvasRect[3] - canvasRect[1]);
+                // PDF uses bottom-left origin, canvas uses top-left
+                const pdfPoint1 = [x1, y1];
+                const pdfPoint2 = [x2, y2];
+                
+                const canvasPoint1 = viewport.convertToViewportPoint(pdfPoint1[0], pdfPoint1[1]);
+                const canvasPoint2 = viewport.convertToViewportPoint(pdfPoint2[0], pdfPoint2[1]);
+                
+                // Calculate bounding box
+                const left = Math.min(canvasPoint1[0], canvasPoint2[0]);
+                const top = Math.min(canvasPoint1[1], canvasPoint2[1]);
+                const width = Math.abs(canvasPoint2[0] - canvasPoint1[0]);
+                const height = Math.abs(canvasPoint2[1] - canvasPoint1[1]);
+
+                console.log(`Annotation ${comment.type}:`, {
+                    pdfRect: comment.rect,
+                    canvasPos: { left, top, width, height }
+                });
 
                 const marker = document.createElement('div');
                 marker.className = `annotation-marker ${comment.type.toLowerCase()}`;
@@ -1954,8 +1967,12 @@
                 marker.style.top = top + 'px';
                 
                 if (comment.type === 'Text') {
+                    // Sticky note icon
                     marker.textContent = '💬';
-                } else if (comment.type === 'Highlight') {
+                    marker.style.width = '24px';
+                    marker.style.height = '24px';
+                } else if (comment.type === 'Highlight' || comment.type === 'Underline' || comment.type === 'StrikeOut') {
+                    // Highlighted area
                     marker.style.width = width + 'px';
                     marker.style.height = height + 'px';
                 }
@@ -2005,7 +2022,10 @@
                 overlay.appendChild(marker);
             });
 
-            canvas.parentElement.style.position = 'relative';
+            // Ensure parent has relative positioning
+            if (!canvas.parentElement.style.position || canvas.parentElement.style.position === 'static') {
+                canvas.parentElement.style.position = 'relative';
+            }
             canvas.parentElement.appendChild(overlay);
         }
 
