@@ -1849,45 +1849,134 @@
         let allComments = {};
         let currentPageAnnotations = [];
 
+        // Workaround for PDF.js not decoding unicode Contents in annotations
+        async function extractAnnotationContents(page, annotation) {
+            try {
+                // Try to access raw PDF object
+                const pdfPage = page;
+                
+                // PDF.js sometimes doesn't decode unicode strings in Contents
+                // Try alternative methods to get the text
+                
+                // Method 1: Check if annotation has raw data
+                if (annotation.contentsObj) {
+                    return String(annotation.contentsObj);
+                }
+                
+                // Method 2: Try to get from annotation reference
+                if (annotation.ref && pdfPage.commonObjs) {
+                    try {
+                        const obj = await pdfPage.commonObjs.get(annotation.ref);
+                        if (obj && obj.Contents) {
+                            return String(obj.Contents);
+                        }
+                    } catch (e) {
+                        // Failed to get object
+                    }
+                }
+                
+                // Method 3: Return undefined to signal no contents found
+                return null;
+            } catch (err) {
+                console.error('Error in extractAnnotationContents:', err);
+                return null;
+            }
+        }
+        
+        // Deep annotation reading from PDF internal structure
+        async function readAnnotationData(page, annotationId) {
+            try {
+                const pdfPage = page;
+                const annotationsDict = await pdfPage.getAnnotations({ intent: 'display' });
+                
+                // Try to access raw PDF objects
+                const pageRef = pdfPage.ref;
+                if (!pageRef) return null;
+                
+                // This is experimental - try to read annotation stream directly
+                console.log('Trying deep read for annotation:', annotationId);
+                
+                return null; // Placeholder for now
+            } catch (err) {
+                console.error('Deep read failed:', err);
+                return null;
+            }
+        }
+        
         async function extractPageComments(page, pageNumber) {
             try {
                 const annotations = await page.getAnnotations();
                 const textContent = await page.getTextContent();
                 currentPageAnnotations = [];
                 
-                console.log(`Page ${pageNumber}: Found ${annotations.length} annotations`);
+                console.log(`%cPage ${pageNumber}: Found ${annotations.length} annotations`, 'color: blue; font-weight: bold');
+                
+                // First pass: collect all annotations and build a map
+                const annotationMap = {};
+                for (const annotation of annotations) {
+                    annotationMap[annotation.id] = annotation;
+                }
                 
                 for (const annotation of annotations) {
-                    console.log('Annotation:', {
-                        subtype: annotation.subtype,
-                        contents: annotation.contents,
-                        title: annotation.title,
-                        annotationType: annotation.annotationType,
-                        fieldName: annotation.fieldName,
-                        hasPopup: annotation.hasPopup,
-                        id: annotation.id
-                    });
+                    // Log full annotation object for debugging
+                    console.group(`Annotation ${annotation.id}`);
+                    console.log('Type:', annotation.subtype);
+                    console.log('Contents:', annotation.contents);
+                    console.log('Title:', annotation.title);
+                    console.log('Has popup:', annotation.popup);
+                    console.log('All properties:', Object.keys(annotation));
+                    console.groupEnd();
                     
-                    // Skip link annotations
-                    if (annotation.subtype === 'Link') continue;
+                    // Skip link and popup annotations
+                    if (annotation.subtype === 'Link' || annotation.subtype === 'Popup') continue;
                     
                     const comment = {
                         page: pageNumber,
                         type: annotation.subtype,
                         content: '',
-                        author: annotation.title || annotation.userName || '',
+                        author: annotation.title || annotation.userName || annotation.T || 'damli',
                         color: annotation.color || null,
                         rect: annotation.rect || null,
                         highlightedText: '',
-                        popupContents: annotation.popupContents || ''
+                        rawAnnotation: annotation
                     };
                     
                     // Try to get contents from various sources
-                    let commentText = annotation.contents || 
-                                    annotation.popupContents || 
-                                    annotation.richText || 
-                                    annotation.alternativeText ||
+                    let commentText = '';
+                    
+                    // Try workaround method
+                    const altContents = await extractAnnotationContents(page, annotation);
+                    if (altContents) {
+                        commentText = altContents;
+                        console.log('%c✓ Got contents from workaround method!', 'color: green', commentText);
+                    }
+                    
+                    // Try all possible content fields
+                    if (!commentText) {
+                        commentText = annotation.contents || 
+                                    annotation.Contents ||
+                                    annotation.contentsObj ||
+                                    annotation.RC || // Rich text contents
+                                    annotation.DS || // Default style string
                                     '';
+                    }
+                    
+                    // Check if there's a linked popup annotation
+                    if (!commentText && annotation.popup && annotationMap[annotation.popup]) {
+                        const popupAnnotation = annotationMap[annotation.popup];
+                        commentText = popupAnnotation.contents || popupAnnotation.Contents || '';
+                        if (commentText) console.log('%c✓ Found popup contents', 'color: green', commentText);
+                    }
+                    
+                    // Check for reply structure
+                    if (!commentText && annotation.inReplyTo && annotationMap[annotation.inReplyTo]) {
+                        const parentAnnotation = annotationMap[annotation.inReplyTo];
+                        commentText = parentAnnotation.contents || parentAnnotation.Contents || '';
+                        if (commentText) console.log('%c✓ Found reply contents', 'color: green', commentText);
+                    }
+                    
+                    // Ensure commentText is a string
+                    commentText = String(commentText || '');
                     
                     // Extract text content from the annotated region for context
                     if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
@@ -1896,31 +1985,26 @@
                             comment.highlightedText = annotatedText;
                         }
                         
-                        // PRIORITY: commentText is the actual comment
-                        if (commentText && commentText.trim()) {
+                        if (commentText.trim()) {
                             comment.content = commentText.trim();
+                            console.log('%c📝 Final content:', 'color: purple', comment.content);
                         } else if (annotatedText) {
-                            comment.content = annotatedText;
+                            comment.content = `[Без комментария]\n${annotatedText}`;
                         } else {
-                            comment.content = 'Выделение';
+                            comment.content = '[Выделение без текста]';
                         }
                     } else if (annotation.subtype === 'FreeText') {
-                        comment.content = commentText || '';
+                        comment.content = commentText || '[Пустой текст]';
                     } else if (annotation.subtype === 'Text') {
-                        // Sticky note - always has contents
-                        comment.content = commentText || 'Заметка';
+                        comment.content = commentText || '[Заметка без текста]';
                     } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
-                        comment.content = commentText || 'Геометрическая метка';
+                        comment.content = commentText || '[Фигура без комментария]';
                     } else if (annotation.subtype === 'Ink') {
-                        comment.content = commentText || 'Рисунок/стрелка';
-                    } else if (annotation.subtype === 'Popup') {
-                        // Try to extract popup content
-                        comment.content = commentText || annotation.parentId || 'Всплывающая заметка';
+                        comment.content = commentText || '[Рисунок]';
                     } else {
-                        comment.content = commentText || annotation.subtype || 'Комментарий';
+                        comment.content = commentText || `[${annotation.subtype}]`;
                     }
                     
-                    // Always add annotation even if no content, for debugging
                     currentPageAnnotations.push(comment);
                     if (!allComments[pageNumber]) {
                         allComments[pageNumber] = [];
@@ -1928,11 +2012,11 @@
                     allComments[pageNumber].push(comment);
                 }
                 
-                console.log(`Page ${pageNumber}: Extracted ${currentPageAnnotations.length} comments`);
+                console.log(`%c✅ Page ${pageNumber}: Extracted ${currentPageAnnotations.length} comments`, 'color: green; font-weight: bold');
                 updateCommentsDisplay();
             } catch (err) {
                 console.error('Error extracting comments:', err);
-                showToast('❌ Ошибка извлечения комментариев');
+                showToast('❌ Ошибка: ' + err.message);
             }
         }
 
