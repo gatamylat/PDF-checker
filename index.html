@@ -1852,11 +1852,12 @@
         async function extractPageComments(page, pageNumber) {
             try {
                 const annotations = await page.getAnnotations();
+                const textContent = await page.getTextContent();
                 currentPageAnnotations = [];
                 
-                annotations.forEach(annotation => {
+                for (const annotation of annotations) {
                     // Skip link annotations
-                    if (annotation.subtype === 'Link') return;
+                    if (annotation.subtype === 'Link') continue;
                     
                     const comment = {
                         page: pageNumber,
@@ -1867,11 +1868,22 @@
                         rect: annotation.rect || null
                     };
                     
-                    // Extract text from different annotation types
-                    if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                    // Extract text content for highlight/underline/strikeout annotations
+                    if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
+                        // Try to get text from the annotated region
+                        const annotatedText = extractTextFromRect(textContent, annotation.rect);
+                        if (annotatedText) {
+                            comment.highlightedText = annotatedText;
+                            if (!comment.content) {
+                                comment.content = annotatedText;
+                            } else {
+                                comment.content = `${annotatedText}\n${comment.content}`;
+                            }
+                        } else if (!comment.content) {
+                            comment.content = 'Выделение';
+                        }
+                    } else if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
                         comment.content = annotation.contents || '';
-                    } else if (annotation.subtype === 'Highlight' || annotation.subtype === 'Underline') {
-                        comment.content = annotation.contents || 'Выделение';
                     } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
                         comment.content = annotation.contents || 'Геометрическая метка';
                     } else if (annotation.subtype === 'Ink') {
@@ -1885,12 +1897,38 @@
                         }
                         allComments[pageNumber].push(comment);
                     }
-                });
+                }
                 
                 updateCommentsDisplay();
             } catch (err) {
                 console.error('Error extracting comments:', err);
             }
+        }
+
+        function extractTextFromRect(textContent, rect) {
+            if (!rect || rect.length !== 4) return null;
+            
+            const [x1, y1, x2, y2] = rect;
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
+            
+            let extractedText = '';
+            
+            textContent.items.forEach(item => {
+                const itemX = item.transform[4];
+                const itemY = item.transform[5];
+                
+                // Check if text item is within annotation bounds (with some tolerance)
+                const tolerance = 5;
+                if (itemX >= minX - tolerance && itemX <= maxX + tolerance &&
+                    itemY >= minY - tolerance && itemY <= maxY + tolerance) {
+                    extractedText += item.str;
+                }
+            });
+            
+            return extractedText.trim();
         }
 
         function updateCommentsDisplay() {
@@ -1912,11 +1950,20 @@
                     'Text': 'Заметка',
                     'Highlight': 'Выделение',
                     'Underline': 'Подчеркивание',
+                    'StrikeOut': 'Зачеркивание',
+                    'Squiggly': 'Волнистое',
                     'Square': 'Прямоугольник',
                     'Circle': 'Круг',
                     'Ink': 'Рисунок',
                     'Stamp': 'Штамп'
                 };
+                
+                let contentHtml = comment.content;
+                
+                // If there's highlighted text, show it with emphasis
+                if (comment.highlightedText && comment.highlightedText !== comment.content) {
+                    contentHtml = `<strong>"${comment.highlightedText}"</strong><br>${comment.content.replace(comment.highlightedText, '').trim()}`;
+                }
                 
                 return `
                     <div class="comment-item">
@@ -1924,7 +1971,7 @@
                             <span class="comment-type">${typeNames[comment.type] || comment.type}</span>
                             <span class="comment-page">Стр. ${comment.page}</span>
                         </div>
-                        <div class="comment-content">${comment.content}</div>
+                        <div class="comment-content">${contentHtml}</div>
                         ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
                     </div>
                 `;
@@ -1944,9 +1991,10 @@
                 for (let i = 1; i <= pageCount; i++) {
                     const page = await pdfDoc1.getPage(i);
                     const annotations = await page.getAnnotations();
+                    const textContent = await page.getTextContent();
                     
-                    annotations.forEach(annotation => {
-                        if (annotation.subtype === 'Link') return;
+                    for (const annotation of annotations) {
+                        if (annotation.subtype === 'Link') continue;
                         
                         const comment = {
                             page: i,
@@ -1955,10 +2003,21 @@
                             author: annotation.title || ''
                         };
                         
-                        if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                        // Extract text content for highlight/underline/strikeout annotations
+                        if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
+                            const annotatedText = extractTextFromRect(textContent, annotation.rect);
+                            if (annotatedText) {
+                                comment.highlightedText = annotatedText;
+                                if (!comment.content) {
+                                    comment.content = annotatedText;
+                                } else {
+                                    comment.content = `${annotatedText}\n${comment.content}`;
+                                }
+                            } else if (!comment.content) {
+                                comment.content = 'Выделение';
+                            }
+                        } else if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
                             comment.content = annotation.contents || '';
-                        } else if (annotation.subtype === 'Highlight' || annotation.subtype === 'Underline') {
-                            comment.content = annotation.contents || 'Выделение';
                         } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
                             comment.content = annotation.contents || 'Геометрическая метка';
                         } else if (annotation.subtype === 'Ink') {
@@ -1971,7 +2030,7 @@
                             }
                             allComments[i].push(comment);
                         }
-                    });
+                    }
                 }
                 
                 displayAllComments();
@@ -2002,11 +2061,20 @@
                         'Text': 'Заметка',
                         'Highlight': 'Выделение',
                         'Underline': 'Подчеркивание',
+                        'StrikeOut': 'Зачеркивание',
+                        'Squiggly': 'Волнистое',
                         'Square': 'Прямоугольник',
                         'Circle': 'Круг',
                         'Ink': 'Рисунок',
                         'Stamp': 'Штамп'
                     };
+                    
+                    let contentHtml = comment.content;
+                    
+                    // If there's highlighted text, show it with emphasis
+                    if (comment.highlightedText && comment.highlightedText !== comment.content) {
+                        contentHtml = `<strong>"${comment.highlightedText}"</strong><br>${comment.content.replace(comment.highlightedText, '').trim()}`;
+                    }
                     
                     html += `
                         <div class="comment-item">
@@ -2014,7 +2082,7 @@
                                 <span class="comment-type">${typeNames[comment.type] || comment.type}</span>
                                 <span class="comment-page">Стр. ${comment.page}</span>
                             </div>
-                            <div class="comment-content">${comment.content}</div>
+                            <div class="comment-content">${contentHtml}</div>
                             ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
                         </div>
                     `;
