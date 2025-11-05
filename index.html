@@ -887,6 +887,75 @@
             margin-bottom: 12px;
         }
 
+        .comments-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .comments-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .comments-stats span {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .comments-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .comment-item {
+            padding: 12px;
+            background: var(--card-bg);
+            border: 0.5px solid var(--separator);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .comment-type {
+            font-size: 12px;
+            padding: 2px 8px;
+            background: var(--accent);
+            color: white;
+            border-radius: 4px;
+        }
+
+        .comment-page {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .comment-content {
+            font-size: 14px;
+            color: var(--text-primary);
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .comment-author {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 6px;
+        }
+
         .toast {
             position: fixed;
             bottom: 80px;
@@ -1448,6 +1517,7 @@
             <div class="sidebar-tabs">
                 <button class="sidebar-tab active" data-tab="checklist">Опросник</button>
                 <button class="sidebar-tab" data-tab="notes">Заметки</button>
+                <button class="sidebar-tab" data-tab="comments">Комментарии</button>
             </div>
 
             <div class="sidebar-content">
@@ -1483,6 +1553,30 @@
                         <button class="history-btn" id="exportBackup">💾 Экспорт бэкапа</button>
                         <button class="history-btn" id="importBackup">📥 Импорт бэкапа</button>
                         <input type="file" id="backupFile" accept=".json" style="display: none;">
+                    </div>
+                </div>
+
+                <div class="tab-panel" id="comments">
+                    <h2>Комментарии в PDF</h2>
+                    
+                    <div class="comments-info">
+                        <div class="comments-stats" id="commentsStats">
+                            <span>📄 Страница: <span id="currentPageComments">—</span></span>
+                            <span>💬 Комментариев: <span id="commentsCount">0</span></span>
+                        </div>
+                        <button class="template-btn" id="extractAllComments">📋 Все страницы</button>
+                    </div>
+                    
+                    <div class="comments-list" id="commentsList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💬</div>
+                            <p>Загрузите PDF с комментариями</p>
+                        </div>
+                    </div>
+                    
+                    <div class="export-buttons" style="margin-top: 16px;">
+                        <button class="primary" id="copyComments">Копировать</button>
+                        <button class="success" id="exportComments">Экспорт</button>
                     </div>
                 </div>
             </div>
@@ -1734,6 +1828,11 @@
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 page.render({ canvasContext: ctx, viewport: viewport });
+                
+                // Extract comments from page if it's the main viewer
+                if (!isSecondViewer) {
+                    extractPageComments(page, num);
+                }
             });
             
             if (isSecondViewer) {
@@ -1745,6 +1844,265 @@
                 document.getElementById('pageNum').textContent = num;
             }
         }
+
+        // Comments extraction
+        let allComments = {};
+        let currentPageAnnotations = [];
+
+        async function extractPageComments(page, pageNumber) {
+            try {
+                const annotations = await page.getAnnotations();
+                currentPageAnnotations = [];
+                
+                annotations.forEach(annotation => {
+                    // Skip link annotations
+                    if (annotation.subtype === 'Link') return;
+                    
+                    const comment = {
+                        page: pageNumber,
+                        type: annotation.subtype,
+                        content: annotation.contents || '',
+                        author: annotation.title || '',
+                        color: annotation.color || null,
+                        rect: annotation.rect || null
+                    };
+                    
+                    // Extract text from different annotation types
+                    if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                        comment.content = annotation.contents || '';
+                    } else if (annotation.subtype === 'Highlight' || annotation.subtype === 'Underline') {
+                        comment.content = annotation.contents || 'Выделение';
+                    } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
+                        comment.content = annotation.contents || 'Геометрическая метка';
+                    } else if (annotation.subtype === 'Ink') {
+                        comment.content = annotation.contents || 'Рисунок/стрелка';
+                    }
+                    
+                    if (comment.content) {
+                        currentPageAnnotations.push(comment);
+                        if (!allComments[pageNumber]) {
+                            allComments[pageNumber] = [];
+                        }
+                        allComments[pageNumber].push(comment);
+                    }
+                });
+                
+                updateCommentsDisplay();
+            } catch (err) {
+                console.error('Error extracting comments:', err);
+            }
+        }
+
+        function updateCommentsDisplay() {
+            const commentsList = document.getElementById('commentsList');
+            const commentsCount = document.getElementById('commentsCount');
+            const currentPageComments = document.getElementById('currentPageComments');
+            
+            currentPageComments.textContent = pageNum;
+            commentsCount.textContent = currentPageAnnotations.length;
+            
+            if (currentPageAnnotations.length === 0) {
+                commentsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><p>На этой странице нет комментариев</p></div>';
+                return;
+            }
+            
+            commentsList.innerHTML = currentPageAnnotations.map((comment, i) => {
+                const typeNames = {
+                    'FreeText': 'Текст',
+                    'Text': 'Заметка',
+                    'Highlight': 'Выделение',
+                    'Underline': 'Подчеркивание',
+                    'Square': 'Прямоугольник',
+                    'Circle': 'Круг',
+                    'Ink': 'Рисунок',
+                    'Stamp': 'Штамп'
+                };
+                
+                return `
+                    <div class="comment-item">
+                        <div class="comment-header">
+                            <span class="comment-type">${typeNames[comment.type] || comment.type}</span>
+                            <span class="comment-page">Стр. ${comment.page}</span>
+                        </div>
+                        <div class="comment-content">${comment.content}</div>
+                        ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function extractAllCommentsFromPDF() {
+            if (!pdfDoc1) {
+                showToast('❌ Загрузите PDF');
+                return;
+            }
+            
+            allComments = {};
+            showToast('⏳ Извлечение комментариев...');
+            
+            try {
+                for (let i = 1; i <= pageCount; i++) {
+                    const page = await pdfDoc1.getPage(i);
+                    const annotations = await page.getAnnotations();
+                    
+                    annotations.forEach(annotation => {
+                        if (annotation.subtype === 'Link') return;
+                        
+                        const comment = {
+                            page: i,
+                            type: annotation.subtype,
+                            content: annotation.contents || '',
+                            author: annotation.title || ''
+                        };
+                        
+                        if (annotation.subtype === 'FreeText' || annotation.subtype === 'Text') {
+                            comment.content = annotation.contents || '';
+                        } else if (annotation.subtype === 'Highlight' || annotation.subtype === 'Underline') {
+                            comment.content = annotation.contents || 'Выделение';
+                        } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
+                            comment.content = annotation.contents || 'Геометрическая метка';
+                        } else if (annotation.subtype === 'Ink') {
+                            comment.content = annotation.contents || 'Рисунок/стрелка';
+                        }
+                        
+                        if (comment.content) {
+                            if (!allComments[i]) {
+                                allComments[i] = [];
+                            }
+                            allComments[i].push(comment);
+                        }
+                    });
+                }
+                
+                displayAllComments();
+                showToast('✅ Комментарии извлечены');
+            } catch (err) {
+                showToast('❌ Ошибка извлечения');
+                console.error(err);
+            }
+        }
+
+        function displayAllComments() {
+            const commentsList = document.getElementById('commentsList');
+            const totalComments = Object.values(allComments).reduce((sum, arr) => sum + arr.length, 0);
+            
+            document.getElementById('commentsCount').textContent = totalComments;
+            document.getElementById('currentPageComments').textContent = 'Все';
+            
+            if (totalComments === 0) {
+                commentsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><p>В документе нет комментариев</p></div>';
+                return;
+            }
+            
+            let html = '';
+            for (let pageNum in allComments) {
+                allComments[pageNum].forEach(comment => {
+                    const typeNames = {
+                        'FreeText': 'Текст',
+                        'Text': 'Заметка',
+                        'Highlight': 'Выделение',
+                        'Underline': 'Подчеркивание',
+                        'Square': 'Прямоугольник',
+                        'Circle': 'Круг',
+                        'Ink': 'Рисунок',
+                        'Stamp': 'Штамп'
+                    };
+                    
+                    html += `
+                        <div class="comment-item">
+                            <div class="comment-header">
+                                <span class="comment-type">${typeNames[comment.type] || comment.type}</span>
+                                <span class="comment-page">Стр. ${comment.page}</span>
+                            </div>
+                            <div class="comment-content">${comment.content}</div>
+                            ${comment.author ? `<div class="comment-author">Автор: ${comment.author}</div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            commentsList.innerHTML = html;
+        }
+
+        document.getElementById('extractAllComments').addEventListener('click', extractAllCommentsFromPDF);
+
+        document.getElementById('copyComments').addEventListener('click', () => {
+            const totalComments = Object.values(allComments).reduce((sum, arr) => sum + arr.length, 0);
+            
+            if (totalComments === 0) {
+                showToast('❌ Нет комментариев');
+                return;
+            }
+            
+            let text = '📝 КОММЕНТАРИИ ИЗ PDF\n\n';
+            
+            if (productName.value || productArticle.value) {
+                if (productName.value) text += `Изделие: ${productName.value}\n`;
+                if (productArticle.value) text += `Артикул: ${productArticle.value}\n`;
+                text += '\n';
+            }
+            
+            const now = new Date();
+            text += `Дата: ${now.toLocaleDateString('ru-RU')}, ${now.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}\n`;
+            text += `Всего комментариев: ${totalComments}\n\n`;
+            text += '━━━━━━━━━━━━━━━━━━━━\n\n';
+            
+            for (let pageNum in allComments) {
+                text += `📄 Страница ${pageNum}:\n\n`;
+                allComments[pageNum].forEach((comment, i) => {
+                    text += `${i + 1}. ${comment.content}\n`;
+                    if (comment.author) text += `   Автор: ${comment.author}\n`;
+                    text += '\n';
+                });
+                text += '\n';
+            }
+            
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('✅ Комментарии скопированы');
+            });
+        });
+
+        document.getElementById('exportComments').addEventListener('click', () => {
+            const totalComments = Object.values(allComments).reduce((sum, arr) => sum + arr.length, 0);
+            
+            if (totalComments === 0) {
+                showToast('❌ Нет комментариев');
+                return;
+            }
+            
+            let text = '=== КОММЕНТАРИИ ИЗ PDF ===\n\n';
+            
+            if (productName.value || productArticle.value) {
+                if (productName.value) text += `Изделие: ${productName.value}\n`;
+                if (productArticle.value) text += `Артикул: ${productArticle.value}\n`;
+                text += '\n';
+            }
+            
+            const now = new Date();
+            text += `Дата экспорта: ${now.toLocaleDateString('ru-RU')}, ${now.toLocaleTimeString('ru-RU')}\n`;
+            text += `Всего комментариев: ${totalComments}\n\n`;
+            text += '========================================\n\n';
+            
+            for (let pageNum in allComments) {
+                text += `СТРАНИЦА ${pageNum}\n\n`;
+                allComments[pageNum].forEach((comment, i) => {
+                    text += `${i + 1}. ${comment.content}\n`;
+                    if (comment.author) text += `   Автор: ${comment.author}\n`;
+                    text += '\n';
+                });
+                text += '\n';
+            }
+            
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `comments_${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('💾 Комментарии экспортированы');
+        });
+
 
         document.getElementById('prevPage').addEventListener('click', () => {
             if (pageNum <= 1) return;
@@ -1905,6 +2263,66 @@
         }
 
         // Add scroll/swipe navigation for second viewer when not synced
+        // Add scroll/swipe navigation for first viewer
+        canvas1.parentElement.addEventListener('wheel', (e) => {
+            if (pdfDoc1) {
+                e.preventDefault();
+                
+                if (e.deltaY < 0 && pageNum > 1) {
+                    // Scroll up - previous page
+                    pageNum--;
+                    renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                    if (isSyncEnabled && isDualView && pdfDoc2) {
+                        pageNum2 = pageNum;
+                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                    }
+                } else if (e.deltaY > 0 && pageNum < pageCount) {
+                    // Scroll down - next page
+                    pageNum++;
+                    renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                    if (isSyncEnabled && isDualView && pdfDoc2) {
+                        pageNum2 = pageNum;
+                        renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                    }
+                }
+            }
+        });
+
+        // Add touch navigation for first viewer
+        let touchStartY1 = 0;
+        canvas1.parentElement.addEventListener('touchstart', (e) => {
+            if (pdfDoc1) {
+                touchStartY1 = e.touches[0].clientY;
+            }
+        });
+
+        canvas1.parentElement.addEventListener('touchend', (e) => {
+            if (pdfDoc1) {
+                const touchEndY = e.changedTouches[0].clientY;
+                const diff = touchStartY1 - touchEndY;
+                
+                if (Math.abs(diff) > 50) { // Minimum swipe distance
+                    if (diff > 0 && pageNum < pageCount) {
+                        // Swipe up - next page
+                        pageNum++;
+                        renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                        if (isSyncEnabled && isDualView && pdfDoc2) {
+                            pageNum2 = pageNum;
+                            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                        }
+                    } else if (diff < 0 && pageNum > 1) {
+                        // Swipe down - previous page
+                        pageNum--;
+                        renderPage(pageNum, pdfDoc1, canvas1, ctx1);
+                        if (isSyncEnabled && isDualView && pdfDoc2) {
+                            pageNum2 = pageNum;
+                            renderPage(pageNum2, pdfDoc2, canvas2, ctx2, true);
+                        }
+                    }
+                }
+            }
+        });
+
         canvas2.parentElement.addEventListener('wheel', (e) => {
             if (!isSyncEnabled && isDualView && pdfDoc2) {
                 e.preventDefault();
