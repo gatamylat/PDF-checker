@@ -1855,7 +1855,19 @@
                 const textContent = await page.getTextContent();
                 currentPageAnnotations = [];
                 
+                console.log(`Page ${pageNumber}: Found ${annotations.length} annotations`);
+                
                 for (const annotation of annotations) {
+                    console.log('Annotation:', {
+                        subtype: annotation.subtype,
+                        contents: annotation.contents,
+                        title: annotation.title,
+                        annotationType: annotation.annotationType,
+                        fieldName: annotation.fieldName,
+                        hasPopup: annotation.hasPopup,
+                        id: annotation.id
+                    });
+                    
                     // Skip link annotations
                     if (annotation.subtype === 'Link') continue;
                     
@@ -1863,11 +1875,19 @@
                         page: pageNumber,
                         type: annotation.subtype,
                         content: '',
-                        author: annotation.title || '',
+                        author: annotation.title || annotation.userName || '',
                         color: annotation.color || null,
                         rect: annotation.rect || null,
-                        highlightedText: ''
+                        highlightedText: '',
+                        popupContents: annotation.popupContents || ''
                     };
+                    
+                    // Try to get contents from various sources
+                    let commentText = annotation.contents || 
+                                    annotation.popupContents || 
+                                    annotation.richText || 
+                                    annotation.alternativeText ||
+                                    '';
                     
                     // Extract text content from the annotated region for context
                     if (['Highlight', 'Underline', 'StrikeOut', 'Squiggly'].includes(annotation.subtype)) {
@@ -1876,40 +1896,43 @@
                             comment.highlightedText = annotatedText;
                         }
                         
-                        // PRIORITY: annotation.contents is the actual comment from the manager
-                        if (annotation.contents && annotation.contents.trim()) {
-                            comment.content = annotation.contents.trim();
+                        // PRIORITY: commentText is the actual comment
+                        if (commentText && commentText.trim()) {
+                            comment.content = commentText.trim();
                         } else if (annotatedText) {
-                            // Fallback: if no comment text, show what was highlighted
                             comment.content = annotatedText;
                         } else {
                             comment.content = 'Выделение';
                         }
                     } else if (annotation.subtype === 'FreeText') {
-                        comment.content = annotation.contents || '';
+                        comment.content = commentText || '';
                     } else if (annotation.subtype === 'Text') {
                         // Sticky note - always has contents
-                        comment.content = annotation.contents || 'Заметка';
+                        comment.content = commentText || 'Заметка';
                     } else if (annotation.subtype === 'Square' || annotation.subtype === 'Circle') {
-                        comment.content = annotation.contents || 'Геометрическая метка';
+                        comment.content = commentText || 'Геометрическая метка';
                     } else if (annotation.subtype === 'Ink') {
-                        comment.content = annotation.contents || 'Рисунок/стрелка';
+                        comment.content = commentText || 'Рисунок/стрелка';
+                    } else if (annotation.subtype === 'Popup') {
+                        // Try to extract popup content
+                        comment.content = commentText || annotation.parentId || 'Всплывающая заметка';
                     } else {
-                        comment.content = annotation.contents || 'Комментарий';
+                        comment.content = commentText || annotation.subtype || 'Комментарий';
                     }
                     
-                    if (comment.content) {
-                        currentPageAnnotations.push(comment);
-                        if (!allComments[pageNumber]) {
-                            allComments[pageNumber] = [];
-                        }
-                        allComments[pageNumber].push(comment);
+                    // Always add annotation even if no content, for debugging
+                    currentPageAnnotations.push(comment);
+                    if (!allComments[pageNumber]) {
+                        allComments[pageNumber] = [];
                     }
+                    allComments[pageNumber].push(comment);
                 }
                 
+                console.log(`Page ${pageNumber}: Extracted ${currentPageAnnotations.length} comments`);
                 updateCommentsDisplay();
             } catch (err) {
                 console.error('Error extracting comments:', err);
+                showToast('❌ Ошибка извлечения комментариев');
             }
         }
 
